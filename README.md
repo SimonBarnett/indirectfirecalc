@@ -1,5 +1,7 @@
 # RF-Minimized Weapon-Mounted Spotter System for Multi-Weapon Indirect Fire Targeting
 
+[Українська версія](https://github.com/SimonBarnett/indirectfirecalc/tree/main?tab=readme-ov-file#%D1%81%D0%B8%D1%81%D1%82%D0%B5%D0%BC%D0%B0-%D0%BF%D1%80%D0%B8%D1%86%D1%96%D0%BB%D1%8E%D0%B2%D0%B0%D0%BD%D0%BD%D1%8F-%D0%B7-%D0%BC%D1%96%D0%BD%D1%96%D0%BC%D0%B0%D0%BB%D1%8C%D0%BD%D0%B8%D0%BC-%D1%80%D0%B0%D0%B4%D1%96%D0%BE%D0%B2%D0%B8%D0%BF%D1%80%D0%BE%D0%BC%D1%96%D0%BD%D1%8E%D0%B2%D0%B0%D0%BD%D0%BD%D1%8F%D0%BC-%D0%B4%D0%BB%D1%8F-%D0%BD%D0%B5%D0%BF%D1%80%D1%8F%D0%BC%D0%BE%D0%B3%D0%BE-%D0%B2%D0%BE%D0%B3%D0%BD%D1%8E-%D0%BA%D1%96%D0%BB%D1%8C%D0%BA%D0%BE%D0%BC%D0%B0-%D0%B2%D0%B8%D0%B4%D0%B0%D0%BC%D0%B8-%D0%B7%D0%B1%D1%80%D0%BE%D1%97)
+
 ## Introduction
 
 In Ukraine’s GPS-denied, DF-threatened environment as of March 1, 2025, Russian jamming disrupts traditional positioning, while RF direction finding (DF) endangers units emitting predictable signals.
