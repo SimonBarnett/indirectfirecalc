@@ -12,13 +12,17 @@ const int TRIGGER_BUTTON_PIN = 2;
 const int RED_LED_PIN = 8;        
 const int GREEN_LED_PIN = 9;      
 
+// Constants
+const int DEVICE_ID = 1; // S1=1, S2=2
+const unsigned long RESPONSE_TIMEOUT = 500; // 500ms
+const float SPEED_OF_LIGHT = 3e8; // Speed of light in m/s
+
 // Components
 SoftwareSerial loraSerial(LORA_RX_PIN, LORA_TX_PIN); 
 SoftwareSerial rangeSerial(RANGE_RX_PIN, RANGE_TX_PIN); 
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 RTC_DS3231 rtc;
 
-const int DEVICE_ID = 1; // S1=1, S2=2
 bool sensorsOperational = true; // Track sensor status
 
 void setup() {
@@ -36,7 +40,7 @@ void setup() {
   if (!initializeSensors()) {
     sensorFailure();
   } else {
-    flashGreenLED();
+    flashLED(GREEN_LED_PIN, 500);
   }
   
   attachInterrupt(digitalPinToInterrupt(TRIGGER_BUTTON_PIN), onClick, FALLING);
@@ -59,7 +63,7 @@ void onClick() {
   
   unsigned long start = millis();
   bool success = false;
-  while (millis() - start < 500) { // Wait 500ms for response
+  while (millis() - start < RESPONSE_TIMEOUT) { // Wait for response
     if (loraSerial.available()) {
       String response = loraSerial.readStringUntil('\n');
       if (response.startsWith("B1")) {
@@ -84,15 +88,15 @@ void onClick() {
   }
   
   if (success) { // Flash green LED for 1 second on successful transmit
-    flashGreenLED();
+    flashLED(GREEN_LED_PIN, 1000);
   } else { // Flash red LED for 1 second on failed transmit
-    flashRedLED();
+    flashLED(RED_LED_PIN, 1000);
   }
 }
 
 float getDistanceFromB1(float b1Time) {
   float now = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
-  return (now - b1Time) * 3e8; // TOF * speed of light
+  return (now - b1Time) * SPEED_OF_LIGHT; // TOF * speed of light
 }
 
 float getBearing(bool toBase = false) {
@@ -127,20 +131,17 @@ void setLEDs(int redState, int greenState) {
   digitalWrite(GREEN_LED_PIN, greenState);
 }
 
-void flashGreenLED() {
-  setLEDs(LOW, HIGH);
-  delay(500); 
-  setLEDs(LOW, LOW);
-}
-
-void flashRedLED() {
-  setLEDs(HIGH, LOW);
-  delay(1000);
-  setLEDs(LOW, LOW);
+void flashLED(int pin, int duration) {
+  digitalWrite(pin, HIGH);
+  delay(duration);
+  digitalWrite(pin, LOW);
 }
 
 bool initializeSensors() {
-  return mag.begin() && rtc.begin();
+  if (!mag.begin() || !rtc.begin()) {
+    return false;
+  }
+  return true;
 }
 
 void sensorFailure() {
