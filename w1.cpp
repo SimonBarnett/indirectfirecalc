@@ -7,6 +7,12 @@ const int WIND_SPEED_PIN = A0;
 const int SENSOR_FAIL_RED_PIN = 2; // Red LED for sensor failure
 const int SENSOR_OK_GREEN_PIN = 3; // Green LED for startup success
 
+// Constants
+const int WIND_SPEED_MAX_RAW = 1023;
+const int WIND_SPEED_MAX_MPS = 30;
+const int INIT_DELAY_MS = 500;
+const int UPDATE_INTERVAL_MS = 1000;
+
 // Components
 Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
 Adafruit_BME280 bme;
@@ -19,43 +25,56 @@ void setup() {
   digitalWrite(SENSOR_FAIL_RED_PIN, LOW); // LEDs off initially
   digitalWrite(SENSOR_OK_GREEN_PIN, LOW);
   
-  // Check sensors on startup
-  if (!mag.begin() || !bme.begin(0x76)) {
-    digitalWrite(SENSOR_FAIL_RED_PIN, HIGH); // Red LED on if sensors fail
-    Serial.println("Sensor failure");
-    while (1); // Halt if sensors fail initially
+  if (!initializeSensors()) {
+    handleSensorError();
   } else {
-    // Flash green once on successful startup
-    digitalWrite(SENSOR_OK_GREEN_PIN, HIGH);
-    delay(500); // Short flash for startup
-    digitalWrite(SENSOR_OK_GREEN_PIN, LOW);
+    indicateSuccessfulStartup();
   }
 }
 
 void loop() {
+  updateSensorReadings();
+  delay(UPDATE_INTERVAL_MS); // Update every 1s
+}
+
+bool initializeSensors() {
+  return mag.begin() && bme.begin(0x76);
+}
+
+void handleSensorError() {
+  digitalWrite(SENSOR_FAIL_RED_PIN, HIGH); // Red LED on if sensors fail
+  Serial.println("Sensor failure");
+  while (true); // Halt if sensors fail initially
+}
+
+void indicateSuccessfulStartup() {
+  digitalWrite(SENSOR_OK_GREEN_PIN, HIGH);
+  delay(INIT_DELAY_MS); // Short flash for startup
+  digitalWrite(SENSOR_OK_GREEN_PIN, LOW);
+}
+
+void updateSensorReadings() {
   float speed = getWindSpeed();
   float dir = getWindDirection();
   float pressure = bme.readPressure() / 100.0; // hPa
   float temp = bme.readTemperature(); // °C
   float humidity = bme.readHumidity(); // % RH
   
-  // Check sensors during operation
   if (isnan(dir) || isnan(pressure) || isnan(temp) || isnan(humidity)) {
     digitalWrite(SENSOR_FAIL_RED_PIN, HIGH); // Red LED on if sensors fail
-    digitalWrite(SENSOR_OK_GREEN_PIN, LOW);
   } else {
-    digitalWrite(SENSOR_FAIL_RED_PIN, LOW);  // LED off if sensors work
-    digitalWrite(SENSOR_OK_GREEN_PIN, LOW);
-    String packet = String(speed) + "," + String(dir) + "," + 
-                    String(pressure) + "," + String(temp) + "," + String(humidity);
-    Serial.println(packet); // Send to B1 via USB
+    digitalWrite(SENSOR_FAIL_RED_PIN, LOW); // LED off if sensors work
+    Serial.print(speed); Serial.print(",");
+    Serial.print(dir); Serial.print(",");
+    Serial.print(pressure); Serial.print(",");
+    Serial.print(temp); Serial.print(",");
+    Serial.println(humidity);
   }
-  delay(1000); // Update every 1s
 }
 
 float getWindSpeed() {
   int raw = analogRead(WIND_SPEED_PIN);
-  return map(raw, 0, 1023, 0, 30) * 0.1; // 0-30 m/s
+  return map(raw, 0, WIND_SPEED_MAX_RAW, 0, WIND_SPEED_MAX_MPS) * 0.1; // 0-30 m/s
 }
 
 float getWindDirection() {
