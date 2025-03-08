@@ -14,7 +14,7 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { buttonPressed = true; }, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), handleButtonInterrupt, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
@@ -37,6 +37,10 @@ private:
     int flashPin;
     int flashDuration;
     static volatile bool buttonPressed;
+
+    static void handleButtonInterrupt() {
+        buttonPressed = true;
+    }
 
     void handleButtonPress() {
         if (buttonPressed) {

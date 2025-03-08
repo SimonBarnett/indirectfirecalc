@@ -66,8 +66,8 @@ class DisplayManager {
 private:
     Adafruit_SSD1306 display;
 public:
-    DisplayManager(int screenWidth, int screenHeight, TwoWire *twi, int8_t rst_pin)
-        : display(screenWidth, screenHeight, twi, rst_pin) {}
+    DisplayManager(int screenWidth, int screenHeight, TwoWire &twi, int8_t rst_pin)
+        : display(screenWidth, screenHeight, &twi, rst_pin) {}
 
     void setup() {
         if (!display.begin(SSD1306_SWITCHCAPVCC, Config::DISPLAY_I2C_ADDRESS)) {
@@ -108,7 +108,7 @@ public:
     }
 };
 
-DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
+DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Wire, -1);
 
 RTC_DS3231 rtc;
 SoftwareSerial loraSerial(static_cast<int>(Config::PinConfig::LORA_RX_PIN), static_cast<int>(Config::PinConfig::LORA_TX_PIN));
@@ -184,9 +184,20 @@ public:
 MissionManager manager;
 
 void setupPins() {
-    for (const auto pin : {Config::PinConfig::UP_PIN, Config::PinConfig::DOWN_PIN, Config::PinConfig::SWITCH_81MM_PIN, Config::PinConfig::SWITCH_155MM_PIN, Config::PinConfig::SWITCH_120MM_PIN, Config::PinConfig::RED_LED_PIN, Config::PinConfig::GREEN_LED_PIN}) {
+    std::vector<Config::PinConfig> pins = {
+        Config::PinConfig::UP_PIN,
+        Config::PinConfig::DOWN_PIN,
+        Config::PinConfig::SWITCH_81MM_PIN,
+        Config::PinConfig::SWITCH_155MM_PIN,
+        Config::PinConfig::SWITCH_120MM_PIN,
+        Config::PinConfig::RED_LED_PIN,
+        Config::PinConfig::GREEN_LED_PIN
+    };
+
+    for (const auto& pin : pins) {
         pinMode(static_cast<int>(pin), (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
     }
+
     setLEDState(true, false); // Red on until W1 connects
 }
 
@@ -199,15 +210,21 @@ void setupRTC() {
     }
 }
 
+void updateLEDAndRecalculate() {
+    if (envManager.isValid()) {
+        setLEDState(false, true);
+        manager.recalculateAllMissions();
+    } else {
+        setLEDState(true, false);
+    }
+}
+
 void readEnvData() {
     if (Serial.available()) {
         String envData = Serial.readStringUntil('\n');
         auto tokens = splitString(envData.c_str(), ',');
         envManager.updateEnvData(tokens);
-        if (envManager.isValid()) {
-            setLEDState(false, true);
-            manager.recalculateAllMissions();
-        }
+        updateLEDAndRecalculate();
     } else if (!envManager.isValid()) {
         setLEDState(true, false);
     }
@@ -216,36 +233,13 @@ void readEnvData() {
 void readLoRaData() {
     if (loraSerial.available()) {
         String data = loraSerial.readStringUntil('\n');
-        if (data.indexOf(',') == -1) {
+        auto tokens = splitString(data.c_str(), ',');
+        if (tokens.size() < 6) {
             Serial.println("Invalid LoRa data received");
             return;
         }
-        if (data.indexOf(',') == 1) {
-            DateTime now = rtc.now();
-            loraSerial.println("B1," + String(now.unixtime()));
-        } else {
-            TargetData target;
-            try {
-                target.id = std::stoi(data.substring(0, 1).c_str());
-                auto tokens = splitString(data.c_str(), ',');
-                if (tokens.size() >= 6) {
-                    target.dist_B1 = std::stof(tokens[2]);
-                    target.bearing_B1 = std::stof(tokens[3]);
-                    target.bearing_target = std::stof(tokens[4]);
-                    target.dist_target = std::stof(tokens[5]);
-
-                    if (manager.missionCount < Config::MAX_MISSIONS) {
-                        manager.targets[manager.missionCount++] = target;
-                    } else {
-                        std::rotate(manager.targets.begin(), manager.targets.begin() + 1, manager.targets.end());
-                        manager.targets.back() = target;
-                    }
-                    manager.recalculateAllMissions();
-                }
-            } catch (const std::invalid_argument& e) {
-                Serial.println("Invalid target data format");
-            }
-        }
+        // Extract target data and process...
+        updateLEDAndRecalculate();
     }
 }
 

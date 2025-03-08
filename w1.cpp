@@ -21,6 +21,30 @@ struct Config {
     static constexpr float windSpeedConversionFactor = 0.1;
 };
 
+// LogOutput interface
+class LogOutput {
+public:
+    virtual void begin(long baudRate) = 0;
+    virtual void print(const char* message) = 0;
+    virtual void println(const char* message) = 0;
+};
+
+// SerialLogOutput class
+class SerialLogOutput : public LogOutput {
+public:
+    void begin(long baudRate) override {
+        Serial.begin(baudRate);
+    }
+
+    void print(const char* message) override {
+        Serial.print(message);
+    }
+
+    void println(const char* message) override {
+        Serial.println(message);
+    }
+};
+
 // Logger class
 class Logger {
 public:
@@ -30,26 +54,26 @@ public:
         ERROR
     };
 
-    Logger() : currentLogLevel(INFO) {}
+    Logger(LogOutput& output) : currentLogLevel(INFO), output(output) {}
 
     void begin(long baudRate) {
-        Serial.begin(baudRate);
+        output.begin(baudRate);
     }
 
     void log(const char* message, LogLevel level = INFO) {
         if (level >= currentLogLevel) {
             const char* levelStr[] = {"[INFO] ", "[WARNING] ", "[ERROR] "};
-            Serial.print(levelStr[level]);
-            Serial.println(message);
+            output.print(levelStr[level]);
+            output.println(message);
         }
     }
 
     void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
-        Serial.print("Speed: "); Serial.print(speed); Serial.print(", ");
-        Serial.print("Direction: "); Serial.print(dir); Serial.print(", ");
-        Serial.print("Pressure: "); Serial.print(pressure); Serial.print(", ");
-        Serial.print("Temperature: "); Serial.print(temp); Serial.print(", ");
-        Serial.print("Humidity: "); Serial.println(humidity);
+        output.print("Speed: "); output.print(speed); output.print(", ");
+        output.print("Direction: "); output.print(dir); output.print(", ");
+        output.print("Pressure: "); output.print(pressure); output.print(", ");
+        output.print("Temperature: "); output.print(temp); output.print(", ");
+        output.print("Humidity: "); output.println(humidity);
     }
 
     void setLogLevel(LogLevel level) {
@@ -58,45 +82,65 @@ public:
 
 private:
     LogLevel currentLogLevel;
+    LogOutput& output;
 };
 
-// LED Manager class
-class LEDManager {
+// LED class
+class LED {
 public:
-    LEDManager(int redPin, int greenPin) : redPin(redPin), greenPin(greenPin) {}
+    LED(int pin) : pin(pin) {}
 
     void setup() {
-        pinMode(redPin, OUTPUT);
-        pinMode(greenPin, OUTPUT);
-        setRedLEDState(false);
-        setGreenLEDState(false);
+        pinMode(pin, OUTPUT);
+        setState(false);
     }
 
-    void setRedLEDState(bool state) {
-        digitalWrite(redPin, state ? HIGH : LOW);
+    void setState(bool state) {
+        digitalWrite(pin, state ? HIGH : LOW);
     }
 
-    void setGreenLEDState(bool state) {
-        digitalWrite(greenPin, state ? HIGH : LOW);
-    }
-
-    bool getRedLEDState() const {
-        return digitalRead(redPin);
+    bool getState() const {
+        return digitalRead(pin);
     }
 
 private:
-    int redPin;
-    int greenPin;
+    int pin;
 };
 
-// Sensor Initializer class
+// LEDManager class
+class LEDManager {
+public:
+    LEDManager(int redPin, int greenPin) : redLED(redPin), greenLED(greenPin) {}
+
+    void setup() {
+        redLED.setup();
+        greenLED.setup();
+    }
+
+    void setRedLEDState(bool state) {
+        redLED.setState(state);
+    }
+
+    void setGreenLEDState(bool state) {
+        greenLED.setState(state);
+    }
+
+    bool getRedLEDState() const {
+        return redLED.getState();
+    }
+
+private:
+    LED redLED;
+    LED greenLED;
+};
+
+// SensorInitializer class
 class SensorInitializer {
 public:
     SensorInitializer(Logger& logger) : logger(logger) {}
 
     bool initializeSensors(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
-        int retryCount = 3;
-        while (retryCount--) {
+        return retry([&]() {
             if (mag.begin()) {
                 if (bme.begin(Config::bme280Address)) {
                     return true;
@@ -106,16 +150,26 @@ public:
             } else {
                 logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
             }
-            delay(1000); // Delay before retry
-        }
-        return false;
+            return false;
+        }, 3, 1000);
     }
 
 private:
     Logger& logger;
+
+    template <typename Func>
+    bool retry(Func func, int retries, int delayMs) {
+        while (retries--) {
+            if (func()) {
+                return true;
+            }
+            delay(delayMs);
+        }
+        return false;
+    }
 };
 
-// Error Manager class
+// ErrorManager class
 class ErrorManager {
 public:
     ErrorManager(LEDManager& ledManager, Logger& logger)
@@ -147,7 +201,7 @@ private:
     bool errorState;
 };
 
-// Sensor Reader class
+// SensorReader class
 class SensorReader {
 public:
     SensorReader(Logger& logger) : logger(logger) {}
@@ -191,7 +245,7 @@ private:
     }
 };
 
-// Sensor Manager class
+// SensorManager class
 class SensorManager {
 public:
     SensorManager(LEDManager& ledManager, Logger& logger)
@@ -255,8 +309,9 @@ private:
 };
 
 // Configuration and setup
+SerialLogOutput serialOutput;
+Logger logger(serialOutput);
 LEDManager ledManager(Config::sensorFailRedPin, Config::sensorOkGreenPin);
-Logger logger;
 SensorManager sensorManager(ledManager, logger);
 
 void setup() {
