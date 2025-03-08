@@ -1,45 +1,5 @@
-#include <Wire.h>
-#include <Adafruit_HMC5883_U.h>
-#include <SoftwareSerial.h>
-#include <RTClib.h>
-
-// Pin Definitions
-struct PinConfig {
-    constexpr static int LORA_RX_PIN = 10;
-    constexpr static int LORA_TX_PIN = 11;
-    constexpr static int RANGE_RX_PIN = 3;
-    constexpr static int RANGE_TX_PIN = 4;
-    constexpr static int TRIGGER_BUTTON_PIN = 2;
-    constexpr static int RED_LED_PIN = 8;
-    constexpr static int GREEN_LED_PIN = 9;
-};
-
-// Constants
-namespace Constants {
-    constexpr int DEVICE_ID = 1; 
-    constexpr unsigned long RESPONSE_TIMEOUT_MS = 500; 
-    constexpr float SPEED_OF_LIGHT = 3e8;
-    constexpr float DEFAULT_DISTANCE = 3000.0;
-    constexpr int SERIAL_BAUD_RATE = 9600;
-    constexpr char RANGE_COMMAND[] = "RANGE";
-    constexpr char RESPONSE_PREFIX[] = "B1";
-    constexpr int LED_FLASH_DURATION_MS = 1000;
-    constexpr int LED_BLINK_INTERVAL_MS = 50;
-    constexpr int BUFFER_SIZE = 64;
-    constexpr int DATA_BUFFER_SIZE = 128;
-    constexpr char MAG_INIT_FAIL_MSG[] = "Magnetometer initialization failed!";
-    constexpr char RTC_INIT_FAIL_MSG[] = "RTC initialization failed!";
-    constexpr int MAGNETOMETER_ID = 12345;  
-}
-
-// Components
 class SensorSystem {
 public:
-    static SensorSystem& getInstance() {
-        static SensorSystem instance;
-        return instance;
-    }
-
     void setup() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
         initializeSerialPorts();
@@ -61,7 +21,7 @@ public:
     void loop() {
         if (buttonPressed) {
             buttonPressed = false;
-            delay(50); // Debounce delay
+            delay(Constants::DEBOUNCE_DELAY_MS); // Debounce delay
             if (digitalRead(PinConfig::TRIGGER_BUTTON_PIN) == LOW) {
                 onClick();
             }
@@ -84,8 +44,6 @@ private:
     int flashPin;
     int flashDuration;
     static volatile bool buttonPressed;
-
-    SensorSystem() = default;
 
     void onClick() {
         if (!sensorsOperational) return;
@@ -190,12 +148,15 @@ private:
     }
 
     void handleFlashLED() {
-        if (flashing) {
-            const unsigned long currentTime = millis();
-            const bool isTimeToTurnOff = currentTime - lastFlashTime >= flashDuration;
+        if (!flashing) return;
+
+        const unsigned long currentTime = millis();
+        if (currentTime - lastFlashTime >= flashDuration) {
+            digitalWrite(flashPin, LOW);
+            flashing = false;
+        } else {
             const bool isBlinkOn = (currentTime / Constants::LED_BLINK_INTERVAL_MS) % 2 == 0;
-            digitalWrite(flashPin, isTimeToTurnOff ? LOW : isBlinkOn ? HIGH : LOW);
-            flashing = !isTimeToTurnOff;
+            digitalWrite(flashPin, isBlinkOn ? HIGH : LOW);
         }
     }
 
@@ -216,14 +177,13 @@ private:
         setLEDState(HIGH, LOW);
         Serial.println("Sensor failure. Attempting to recover...");
 
-        // Implement a retry mechanism
-        for (int i = 0; i < 3; ++i) {
+        for (int i = 0; i < Constants::RETRY_ATTEMPTS; ++i) {
             if (initializeSensors()) {
                 sensorsOperational = true;
                 Serial.println("Sensor recovery successful.");
                 return;
             }
-            delay(1000); // Wait before retrying
+            delay(Constants::SENSOR_RECOVERY_DELAY_MS); // Wait before retrying
         }
 
         Serial.println("Sensor recovery failed.");
@@ -238,10 +198,12 @@ private:
 
 volatile bool SensorSystem::buttonPressed = false;
 
+SensorSystem sensorSystem;
+
 void setup() {
-    SensorSystem::getInstance().setup();
+    sensorSystem.setup();
 }
 
 void loop() {
-    SensorSystem::getInstance().loop();
+    sensorSystem.loop();
 }

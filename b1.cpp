@@ -293,43 +293,69 @@ void computeWindAdjustedTarget(float& x_t, float& y_t, const TargetData& target,
     y_t += wind_y * properties.tof;
 }
 
-void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
+struct Coordinates {
+    float x;
+    float y;
+};
+
+Coordinates calculateTargetCoordinates(const TargetData& target) {
     float rad_B1 = toRadians(target.bearing_B1);
     float x_s = target.dist_B1 * sin(rad_B1);
     float y_s = target.dist_B1 * cos(rad_B1);
     float rad_t = toRadians(target.bearing_target);
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
+    return {x_t, y_t};
+}
 
+float calculateDensityFactor() {
     float temp_k = envManager.data.temp + 273.15;
     float pv = (envManager.data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.data.temp) / (237.3 + envManager.data.temp));
     float pd = envManager.data.pressure - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
-    float density_factor = 1.225 / density;
+    return 1.225 / density;
+}
 
-    computeWindAdjustedTarget(x_t, y_t, target, weaponProperties.at(weapon));
+float calculateRange(float x_t, float y_t, float density_factor) {
+    return sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
+}
 
-    mission.range = sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
-    mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * Config::PI));
-    if (mission.azimuth < 0) mission.azimuth += 6400;
+float calculateAzimuth(float x_t, float y_t) {
+    float azimuth = atan2(x_t, y_t) * (6400 / (2 * Config::PI));
+    if (azimuth < 0) azimuth += 6400;
+    return azimuth;
+}
 
-    mission.charge = 0;
+int determineCharge(float range, WeaponType weapon) {
+    const auto& properties = weaponProperties.at(weapon);
     for (int i = 0; i < properties.maxCharges; i++) {
         float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::GRAVITY;
         if (weapon == WeaponType::TANK_120MM) max_range = 5000;
-        if (mission.range <= max_range * 1.1) {
-            mission.charge = i;
-            break;
+        if (range <= max_range * 1.1) {
+            return i;
         }
-        if (i == properties.maxCharges - 1) mission.charge = i;
     }
-    float v_chosen = properties.velocities[mission.charge];
+    return properties.maxCharges - 1;
+}
 
+float calculateElevation(float range, WeaponType weapon, int charge) {
+    const auto& properties = weaponProperties.at(weapon);
+    float v_chosen = properties.velocities[charge];
     if (weapon == WeaponType::TANK_120MM) {
-        mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * Config::PI));
+        return atan2(range, target.dist_target) * (6400 / (2 * Config::PI));
     } else {
-        mission.elevation = 0.5 * asin((mission.range * Config::GRAVITY) / (v_chosen * v_chosen)) * (6400 / (2 * Config::PI));
+        return 0.5 * asin((range * Config::GRAVITY) / (v_chosen * v_chosen)) * (6400 / (2 * Config::PI));
     }
+}
+
+void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
+    auto coordinates = calculateTargetCoordinates(target);
+    auto density_factor = calculateDensityFactor();
+    computeWindAdjustedTarget(coordinates.x, coordinates.y, target, weaponProperties.at(weapon));
+    mission.range = calculateRange(coordinates.x, coordinates.y, density_factor);
+    mission.azimuth = calculateAzimuth(coordinates.x, coordinates.y);
+    mission.charge = determineCharge(mission.range, weapon);
+    mission.elevation = calculateElevation(mission.range, weapon, mission.charge);
 }
 
 void MissionManager::displayFireMissions() const {

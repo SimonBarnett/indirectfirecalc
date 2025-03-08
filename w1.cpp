@@ -14,14 +14,12 @@ struct Config {
     static constexpr int blinkIntervalMs = 500;
     static constexpr uint8_t bme280Address = 0x76;
     static constexpr int magSensorId = 12345;
+    static constexpr int initDelayMs = 500;
+    static constexpr int updateIntervalMs = 1000;
+    static constexpr int numSensorData = 5;
+    static constexpr float pressureConversionFactor = 100.0;
+    static constexpr float windSpeedConversionFactor = 0.1;
 };
-
-// Constants
-constexpr int INIT_DELAY_MS = 500;
-constexpr int UPDATE_INTERVAL_MS = 1000;
-constexpr int NUM_SENSOR_DATA = 5;
-constexpr float PRESSURE_CONVERSION_FACTOR = 100.0;
-constexpr float WIND_SPEED_CONVERSION_FACTOR = 0.1;
 
 // Logger class
 class Logger {
@@ -161,12 +159,12 @@ public:
     void updateSensorReadings(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
         float speed = getWindSpeed();
         float dir = getWindDirection(mag);
-        float pressure = bme.readPressure() / PRESSURE_CONVERSION_FACTOR;
+        float pressure = bme.readPressure() / Config::pressureConversionFactor;
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
         float readings[] = {speed, dir, pressure, temp, humidity};
-        if (isReadingValid(readings, NUM_SENSOR_DATA)) {
+        if (isReadingValid(readings, Config::numSensorData)) {
             logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
             logger.log("Invalid sensor reading", Logger::WARNING);
@@ -178,7 +176,7 @@ private:
 
     float getWindSpeed() {
         int raw = analogRead(Config::windSpeedPin);
-        return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * WIND_SPEED_CONVERSION_FACTOR;
+        return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * Config::windSpeedConversionFactor;
     }
 
     float getWindDirection(Adafruit_HMC5883_Unified& mag) {
@@ -240,12 +238,19 @@ private:
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        delay(INIT_DELAY_MS);
+        delayNonBlocking(Config::initDelayMs);
         ledManager.setGreenLEDState(false);
     }
 
     bool shouldUpdate(unsigned long currentMillis) {
-        return (currentMillis - lastUpdateMillis) >= UPDATE_INTERVAL_MS;
+        return (currentMillis - lastUpdateMillis) >= Config::updateIntervalMs;
+    }
+
+    void delayNonBlocking(unsigned long delayMs) {
+        unsigned long startMillis = millis();
+        while (millis() - startMillis < delayMs) {
+            // Do nothing, just wait
+        }
     }
 };
 
