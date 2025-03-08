@@ -12,9 +12,11 @@ const int WIND_SPEED_MAX_RAW = 1023;
 const int WIND_SPEED_MAX_MPS = 30;
 const int INIT_DELAY_MS = 500;
 const int UPDATE_INTERVAL_MS = 1000;
+const int MAG_SENSOR_ID = 12345;
+const uint8_t BME280_ADDRESS = 0x76;
 
 // Components
-Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(12345);
+Adafruit_HMC5883_Unified mag = Adafruit_HMC5883_Unified(MAG_SENSOR_ID);
 Adafruit_BME280 bme;
 
 void setup() {
@@ -32,19 +34,36 @@ void setup() {
   }
 }
 
+unsigned long lastUpdate = 0;
+
 void loop() {
-  updateSensorReadings();
-  delay(UPDATE_INTERVAL_MS); // Update every 1s
+  unsigned long currentMillis = millis();
+  if (currentMillis - lastUpdate >= UPDATE_INTERVAL_MS) {
+    lastUpdate = currentMillis;
+    updateSensorReadings();
+  }
 }
 
 bool initializeSensors() {
-  return mag.begin() && bme.begin(0x76);
+  if (!mag.begin()) {
+    Serial.println("Magnetometer initialization failed");
+    return false;
+  }
+  if (!bme.begin(BME280_ADDRESS)) {
+    Serial.println("BME280 initialization failed");
+    return false;
+  }
+  return true;
 }
 
 void handleSensorError() {
   digitalWrite(SENSOR_FAIL_RED_PIN, HIGH); // Red LED on if sensors fail
   Serial.println("Sensor failure");
-  while (true); // Halt if sensors fail initially
+  while (true) {
+    // Blink the red LED to indicate failure
+    digitalWrite(SENSOR_FAIL_RED_PIN, !digitalRead(SENSOR_FAIL_RED_PIN));
+    delay(500); // Blink every 500ms
+  }
 }
 
 void indicateSuccessfulStartup() {

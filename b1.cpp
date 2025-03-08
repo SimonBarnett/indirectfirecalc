@@ -1,14 +1,9 @@
-#include <Wire.h>
-#include <SoftwareSerial.h>
-#include <RTClib.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-
 // Constants
 constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
 constexpr int MAX_MISSIONS = 10;
 constexpr int SCREEN_WIDTH = 128;
 constexpr int SCREEN_HEIGHT = 64;
+constexpr int BAUD_RATE = 9600;
 
 // Pin Definitions
 constexpr int UP_PIN = 3;
@@ -23,6 +18,20 @@ constexpr int LORA_TX_PIN = 11;
 
 // Weapon types
 enum WeaponType { MORTAR_81MM, ARTILLERY_155MM, TANK_120MM };
+
+// Data structure to store weapon properties
+struct WeaponProperties {
+  float tof;
+  std::vector<float> velocities;
+  int maxCharges;
+};
+
+// Weapon properties
+const std::map<WeaponType, WeaponProperties> weaponProperties = {
+  {MORTAR_81MM, {10.0, {70, 120, 170, 210, 250}, 5}},
+  {ARTILLERY_155MM, {20.0, {300, 450, 600, 750, 827}, 5}},
+  {TANK_120MM, {1.0, {1700}, 1}}
+};
 
 // OLED setup
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
@@ -48,14 +57,24 @@ struct FireMission {
   float elevation; // mils
 };
 
-// Globals
-TargetData targets[MAX_MISSIONS];
-FireMission missions[MAX_MISSIONS];
-int missionCount = 0;
-int displayStart = 0;
-float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
-bool envDataValid = false;
-WeaponType lastWeapon = MORTAR_81MM;
+// Class to encapsulate mission data
+class MissionManager {
+public:
+  TargetData targets[MAX_MISSIONS];
+  FireMission missions[MAX_MISSIONS];
+  int missionCount = 0;
+  int displayStart = 0;
+  float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
+  bool envDataValid = false;
+  WeaponType lastWeapon = MORTAR_81MM;
+
+  void recalculateAllMissions();
+  void computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon);
+  void displayFireMissions();
+  WeaponType getWeaponType();
+};
+
+MissionManager manager;
 
 // Function Prototypes
 void setupPins();
@@ -65,14 +84,10 @@ void readEnvData();
 void readLoRaData();
 void handleWeaponTypeChange();
 void handleDisplayNavigation();
-void recalculateAllMissions();
-void computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon);
-void displayFireMissions();
-WeaponType getWeaponType();
 
 void setup() {
-  Serial.begin(9600); // USB to W1
-  loraSerial.begin(9600);
+  Serial.begin(BAUD_RATE); // USB to W1
+  loraSerial.begin(BAUD_RATE);
   Wire.begin();
   
   setupPins();
@@ -123,20 +138,20 @@ void setupRTC() {
 void readEnvData() {
   if (Serial.available()) { // Update environmental data from W1
     String envData = Serial.readStringUntil('\n');
-    wind_speed = envData.substring(0, envData.indexOf(',')).toFloat();
+    manager.wind_speed = envData.substring(0, envData.indexOf(',')).toFloat();
     int pos = envData.indexOf(',');
-    wind_dir = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
+    manager.wind_dir = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
     pos = envData.indexOf(',', pos + 1);
-    pressure = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
+    manager.pressure = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
     pos = envData.indexOf(',', pos + 1);
-    temp = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
+    manager.temp = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
     pos = envData.indexOf(',', pos + 1);
-    humidity = envData.substring(pos + 1).toFloat();
-    envDataValid = true;
+    manager.humidity = envData.substring(pos + 1).toFloat();
+    manager.envDataValid = true;
     digitalWrite(RED_LED_PIN, LOW);   // Green on when W1 connected
     digitalWrite(GREEN_LED_PIN, HIGH);
-    recalculateAllMissions();
-  } else if (!envDataValid) {
+    manager.recalculateAllMissions();
+  } else if (!manager.envDataValid) {
     digitalWrite(RED_LED_PIN, HIGH);  // Red on if no W1 data
     digitalWrite(GREEN_LED_PIN, LOW);
   }
@@ -157,42 +172,42 @@ void readLoRaData() {
       target.bearing_target = data.substring(data.indexOf(',', data.indexOf(',', data.indexOf(',', 2) + 1) + 1) + 1, data.lastIndexOf(',')).toFloat();
       target.dist_target = data.substring(data.lastIndexOf(',') + 1).toFloat();
       
-      if (missionCount < MAX_MISSIONS) {
-        targets[missionCount] = target;
-        missionCount++;
+      if (manager.missionCount < MAX_MISSIONS) {
+        manager.targets[manager.missionCount] = target;
+        manager.missionCount++;
       } else {
         for (int i = 1; i < MAX_MISSIONS; i++) {
-          targets[i - 1] = targets[i];
+          manager.targets[i - 1] = manager.targets[i];
         }
-        targets[MAX_MISSIONS - 1] = target;
+        manager.targets[MAX_MISSIONS - 1] = target;
       }
-      recalculateAllMissions();
+      manager.recalculateAllMissions();
     }
   }
 }
 
 void handleWeaponTypeChange() {
-  WeaponType currentWeapon = getWeaponType();
-  if (currentWeapon != lastWeapon) { // Recalculate on weapon type change
-    lastWeapon = currentWeapon;
-    recalculateAllMissions();
+  WeaponType currentWeapon = manager.getWeaponType();
+  if (currentWeapon != manager.lastWeapon) { // Recalculate on weapon type change
+    manager.lastWeapon = currentWeapon;
+    manager.recalculateAllMissions();
   }
 }
 
 void handleDisplayNavigation() {
-  if (digitalRead(UP_PIN) == LOW && displayStart > 0) {
-    displayStart--;
-    displayFireMissions();
+  if (digitalRead(UP_PIN) == LOW && manager.displayStart > 0) {
+    manager.displayStart--;
+    manager.displayFireMissions();
     delay(200); // Debounce
   }
-  if (digitalRead(DOWN_PIN) == LOW && displayStart + 5 < missionCount) {
-    displayStart++;
-    displayFireMissions();
+  if (digitalRead(DOWN_PIN) == LOW && manager.displayStart + 5 < manager.missionCount) {
+    manager.displayStart++;
+    manager.displayFireMissions();
     delay(200); // Debounce
   }
 }
 
-void recalculateAllMissions() {
+void MissionManager::recalculateAllMissions() {
   if (!envDataValid && missionCount == 0) return; // No data to recalculate if no initial data
   WeaponType weapon = getWeaponType();
   for (int i = 0; i < missionCount; i++) {
@@ -202,7 +217,7 @@ void recalculateAllMissions() {
   displayFireMissions();
 }
 
-void computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
+void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
   float rad_B1 = target.bearing_B1 * PI / 180;
   float x_s = target.dist_B1 * sin(rad_B1);
   float y_s = target.dist_B1 * cos(rad_B1);
@@ -219,47 +234,26 @@ void computeTarget(const TargetData& target, FireMission& mission, WeaponType we
   float wind_rad = wind_dir * PI / 180;
   float wind_x = wind_speed * cos(wind_rad);
   float wind_y = wind_speed * sin(wind_rad);
-  float tof;
-  switch (weapon) {
-    case MORTAR_81MM: tof = 10.0; break;
-    case ARTILLERY_155MM: tof = 20.0; break;
-    case TANK_120MM: tof = 1.0; break;
-  }
-  x_t += wind_x * tof;
-  y_t += wind_y * tof;
+  
+  const WeaponProperties& properties = weaponProperties.at(weapon);
+  x_t += wind_x * properties.tof;
+  y_t += wind_y * properties.tof;
   
   mission.range = sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
   mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * PI));
   if (mission.azimuth < 0) mission.azimuth += 6400;
 
-  float v[5];
-  int maxCharges;
-  switch (weapon) {
-    case MORTAR_81MM:
-      v[0] = 70; v[1] = 120; v[2] = 170; v[3] = 210; v[4] = 250;
-      maxCharges = 5;
-      break;
-    case ARTILLERY_155MM:
-      v[0] = 300; v[1] = 450; v[2] = 600; v[3] = 750; v[4] = 827;
-      maxCharges = 5;
-      break;
-    case TANK_120MM:
-      v[0] = 1700;
-      maxCharges = 1;
-      break;
-  }
-  
   mission.charge = 0;
-  for (int i = 0; i < maxCharges; i++) {
-    float max_range = (v[i] * v[i]) / 9.81;
+  for (int i = 0; i < properties.maxCharges; i++) {
+    float max_range = (properties.velocities[i] * properties.velocities[i]) / 9.81;
     if (weapon == TANK_120MM) max_range = 5000;
     if (mission.range <= max_range * 1.1) {
       mission.charge = i;
       break;
     }
-    if (i == maxCharges - 1) mission.charge = i;
+    if (i == properties.maxCharges - 1) mission.charge = i;
   }
-  float v_chosen = v[mission.charge];
+  float v_chosen = properties.velocities[mission.charge];
   
   if (weapon == TANK_120MM) {
     mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * PI));
@@ -268,7 +262,7 @@ void computeTarget(const TargetData& target, FireMission& mission, WeaponType we
   }
 }
 
-void displayFireMissions() {
+void MissionManager::displayFireMissions() {
   display.clearDisplay();
   display.setCursor(0, 0);
   WeaponType weapon = getWeaponType();
@@ -284,7 +278,7 @@ void displayFireMissions() {
   display.display();
 }
 
-WeaponType getWeaponType() {
+WeaponType MissionManager::getWeaponType() {
   if (digitalRead(SWITCH_81MM_PIN) == LOW) return MORTAR_81MM;
   if (digitalRead(SWITCH_155MM_PIN) == LOW) return ARTILLERY_155MM;
   if (digitalRead(SWITCH_120MM_PIN) == LOW) return TANK_120MM;
