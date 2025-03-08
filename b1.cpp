@@ -48,8 +48,64 @@ const std::map<WeaponType, WeaponProperties> weaponProperties = {
   {TANK_120MM, {1.0, {1700}, 1}}
 };
 
-// OLED setup
-Adafruit_SSD1306 display(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
+// Helper function to split string
+std::vector<String> splitString(const String &str, char delimiter) {
+  std::vector<String> tokens;
+  int start = 0;
+  int end = str.indexOf(delimiter);
+  while (end != -1) {
+    tokens.push_back(str.substring(start, end));
+    start = end + 1;
+    end = str.indexOf(delimiter, start);
+  }
+  tokens.push_back(str.substring(start));
+  return tokens;
+}
+
+// Encapsulate display in a class
+class DisplayManager {
+private:
+  Adafruit_SSD1306 display;
+public:
+  DisplayManager(int screenWidth, int screenHeight, TwoWire *twi, int8_t rst_pin)
+    : display(screenWidth, screenHeight, twi, rst_pin) {}
+
+  void setup() {
+    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+      Serial.println("Display failure");
+      delay(5000); // Wait 5 seconds before attempting a reset
+    }
+    display.clearDisplay();
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.setCursor(0, 0);
+    display.println("Base Station Ready");
+    display.display();
+  }
+
+  void clearDisplay() {
+    display.clearDisplay();
+  }
+
+  void setCursor(int x, int y) {
+    display.setCursor(x, y);
+  }
+
+  void print(const String &message) {
+    display.print(message);
+  }
+
+  void println(const String &message) {
+    display.println(message);
+  }
+
+  void displayContent() {
+    display.display();
+  }
+};
+
+// Create instance
+DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
 
 // RTC and Serial setup
 RTC_DS3231 rtc;
@@ -106,7 +162,7 @@ void setup() {
   Wire.begin();
   
   setupPins();
-  setupDisplay();
+  displayManager.setup();
   setupRTC();
 }
 
@@ -129,23 +185,10 @@ void setupPins() {
   digitalWrite(Config::GREEN_LED_PIN, LOW);
 }
 
-void setupDisplay() {
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println("Display failure");
-    while (1);
-  }
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(0, 0);
-  display.println("Base Station Ready");
-  display.display();
-}
-
 void setupRTC() {
   if (!rtc.begin()) {
     Serial.println("RTC failure");
-    while (1);
+    delay(5000); // Wait 5 seconds before attempting a reset
   }
   rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 }
@@ -153,19 +196,18 @@ void setupRTC() {
 void readEnvData() {
   if (Serial.available()) { // Update environmental data from W1
     String envData = Serial.readStringUntil('\n');
-    manager.wind_speed = envData.substring(0, envData.indexOf(',')).toFloat();
-    int pos = envData.indexOf(',');
-    manager.wind_dir = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
-    pos = envData.indexOf(',', pos + 1);
-    manager.pressure = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
-    pos = envData.indexOf(',', pos + 1);
-    manager.temp = envData.substring(pos + 1, envData.indexOf(',', pos + 1)).toFloat();
-    pos = envData.indexOf(',', pos + 1);
-    manager.humidity = envData.substring(pos + 1).toFloat();
-    manager.envDataValid = true;
-    digitalWrite(Config::RED_LED_PIN, LOW);   // Green on when W1 connected
-    digitalWrite(Config::GREEN_LED_PIN, HIGH);
-    manager.recalculateAllMissions();
+    auto tokens = splitString(envData, ',');
+    if (tokens.size() >= 5) {
+      manager.wind_speed = tokens[0].toFloat();
+      manager.wind_dir = tokens[1].toFloat();
+      manager.pressure = tokens[2].toFloat();
+      manager.temp = tokens[3].toFloat();
+      manager.humidity = tokens[4].toFloat();
+      manager.envDataValid = true;
+      digitalWrite(Config::RED_LED_PIN, LOW);   // Green on when W1 connected
+      digitalWrite(Config::GREEN_LED_PIN, HIGH);
+      manager.recalculateAllMissions();
+    }
   } else if (!manager.envDataValid) {
     digitalWrite(Config::RED_LED_PIN, HIGH);  // Red on if no W1 data
     digitalWrite(Config::GREEN_LED_PIN, LOW);
@@ -182,21 +224,24 @@ void readLoRaData() {
       TargetData target;
       int id = data.substring(0, 1).toInt();
       target.id = id;
-      target.dist_B1 = data.substring(data.indexOf(',', 2) + 1, data.indexOf(',', data.indexOf(',', 2) + 1)).toFloat();
-      target.bearing_B1 = data.substring(data.indexOf(',', data.indexOf(',', 2) + 1) + 1, data.indexOf(',', data.indexOf(',', data.indexOf(',', 2) + 1) + 1)).toFloat();
-      target.bearing_target = data.substring(data.indexOf(',', data.indexOf(',', data.indexOf(',', 2) + 1) + 1) + 1, data.lastIndexOf(',')).toFloat();
-      target.dist_target = data.substring(data.lastIndexOf(',') + 1).toFloat();
-      
-      if (manager.missionCount < Config::MAX_MISSIONS) {
-        manager.targets[manager.missionCount] = target;
-        manager.missionCount++;
-      } else {
-        for (int i = 1; i < Config::MAX_MISSIONS; i++) {
-          manager.targets[i - 1] = manager.targets[i];
+      auto tokens = splitString(data, ',');
+      if (tokens.size() >= 6) {
+        target.dist_B1 = tokens[2].toFloat();
+        target.bearing_B1 = tokens[3].toFloat();
+        target.bearing_target = tokens[4].toFloat();
+        target.dist_target = tokens[5].toFloat();
+        
+        if (manager.missionCount < Config::MAX_MISSIONS) {
+          manager.targets[manager.missionCount] = target;
+          manager.missionCount++;
+        } else {
+          for (int i = 1; i < Config::MAX_MISSIONS; i++) {
+            manager.targets[i - 1] = manager.targets[i];
+          }
+          manager.targets[Config::MAX_MISSIONS - 1] = target;
         }
-        manager.targets[Config::MAX_MISSIONS - 1] = target;
+        manager.recalculateAllMissions();
       }
-      manager.recalculateAllMissions();
     }
   }
 }
@@ -278,19 +323,19 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
 }
 
 void MissionManager::displayFireMissions() {
-  display.clearDisplay();
-  display.setCursor(0, 0);
+  displayManager.clearDisplay();
+  displayManager.setCursor(0, 0);
   WeaponType weapon = getWeaponType();
   String weaponLabel = (weapon == MORTAR_81MM) ? "81mm Mortar" : (weapon == ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
-  display.println("Weapon: " + weaponLabel);
+  displayManager.println("Weapon: " + weaponLabel);
   for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; i++) {
-    display.print("FM "); display.print(missions[i].id);
-    display.print(": Chg "); display.print(missions[i].charge);
-    display.print(", Azi "); display.print((int)missions[i].azimuth);
-    display.print(", Rng "); display.print((int)missions[i].range);
-    display.print(", Ele "); display.println((int)missions[i].elevation);
+    displayManager.print("FM "); displayManager.print(missions[i].id);
+    displayManager.print(": Chg "); displayManager.print(missions[i].charge);
+    displayManager.print(", Azi "); displayManager.print((int)missions[i].azimuth);
+    displayManager.print(", Rng "); displayManager.print((int)missions[i].range);
+    displayManager.print(", Ele "); displayManager.println((int)missions[i].elevation);
   }
-  display.display();
+  displayManager.displayContent();
 }
 
 WeaponType MissionManager::getWeaponType() {
