@@ -191,7 +191,7 @@ public:
 MissionManager manager;
 
 void setupPins() {
-    std::vector<Config::PinConfig> pins = {
+    const std::array<Config::PinConfig, 7> pins = {
         Config::PinConfig::UP_PIN,
         Config::PinConfig::DOWN_PIN,
         Config::PinConfig::SWITCH_81MM_PIN,

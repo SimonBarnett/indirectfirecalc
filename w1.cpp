@@ -19,6 +19,8 @@ struct Config {
     static constexpr int numSensorData = 5;
     static constexpr float pressureConversionFactor = 100.0;
     static constexpr float windSpeedConversionFactor = 0.1;
+    static constexpr int sensorRetries = 3;
+    static constexpr int sensorRetryDelayMs = 1000;
 };
 
 // LogOutput interface
@@ -68,11 +70,11 @@ public:
     }
 
     void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
-        output.print("Speed: "); output.print(speed); output.print(", ");
-        output.print("Direction: "); output.print(dir); output.print(", ");
-        output.print("Pressure: "); output.print(pressure); output.print(", ");
-        output.print("Temperature: "); output.print(temp); output.print(", ");
-        output.print("Humidity: "); output.println(humidity);
+        logFormatted("Speed: ", speed);
+        logFormatted("Direction: ", dir);
+        logFormatted("Pressure: ", pressure);
+        logFormatted("Temperature: ", temp);
+        logFormatted("Humidity: ", humidity);
     }
 
     void setLogLevel(LogLevel level) {
@@ -90,6 +92,12 @@ private:
             case LogLevel::ERROR: return "[ERROR] ";
             default: return "";
         }
+    }
+
+    void logFormatted(const char* label, float value) {
+        output.print(label);
+        output.print(value);
+        output.print(", ");
     }
 };
 
@@ -121,25 +129,37 @@ public:
     LEDManager(int redPin, int greenPin) : redLED(redPin), greenLED(greenPin) {}
 
     void setup() {
-        redLED.setup();
-        greenLED.setup();
+        setupLED(redLED);
+        setupLED(greenLED);
     }
 
     void setRedLEDState(bool state) {
-        redLED.setState(state);
+        setLEDState(redLED, state);
     }
 
     void setGreenLEDState(bool state) {
-        greenLED.setState(state);
+        setLEDState(greenLED, state);
     }
 
     bool getRedLEDState() const {
-        return redLED.getState();
+        return getLEDState(redLED);
     }
 
 private:
     LED redLED;
     LED greenLED;
+
+    void setupLED(LED& led) {
+        led.setup();
+    }
+
+    void setLEDState(LED& led, bool state) {
+        led.setState(state);
+    }
+
+    bool getLEDState(const LED& led) const {
+        return led.getState();
+    }
 };
 
 // SensorInitializer class
@@ -159,7 +179,7 @@ public:
                 logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::LogLevel::ERROR);
             }
             return false;
-        }, 3, 1000);
+        }, Config::sensorRetries, Config::sensorRetryDelayMs);
     }
 
 private:
@@ -180,33 +200,47 @@ private:
 // ErrorManager class
 class ErrorManager {
 public:
-    ErrorManager(LEDManager& ledManager, Logger& logger)
-        : ledManager(ledManager), logger(logger), errorState(false) {}
+    enum class ErrorState {
+        NO_ERROR,
+        SENSOR_FAILURE
+    };
 
-    void handleError() {
-        errorState = true;
-        logger.log("Sensor failure", Logger::LogLevel::ERROR);
-        ledManager.setRedLEDState(true);
+    ErrorManager(LEDManager& ledManager, Logger& logger)
+        : ledManager(ledManager), logger(logger), errorState(ErrorState::NO_ERROR) {}
+
+    void handleError(ErrorState state) {
+        errorState = state;
+        switch (state) {
+            case ErrorState::NO_ERROR:
+                ledManager.setRedLEDState(false);
+                break;
+            case ErrorState::SENSOR_FAILURE:
+                logger.log("Sensor failure", Logger::LogLevel::ERROR);
+                ledManager.setRedLEDState(true);
+                break;
+        }
     }
 
     void blinkRedLEDNonBlocking() {
-        static unsigned long lastBlinkMillis = 0;
-        unsigned long currentMillis = millis();
+        if (errorState == ErrorState::SENSOR_FAILURE) {
+            static unsigned long lastBlinkMillis = 0;
+            unsigned long currentMillis = millis();
 
-        if (currentMillis - lastBlinkMillis >= Config::blinkIntervalMs) {
-            lastBlinkMillis = currentMillis;
-            ledManager.setRedLEDState(!ledManager.getRedLEDState());
+            if (currentMillis - lastBlinkMillis >= Config::blinkIntervalMs) {
+                lastBlinkMillis = currentMillis;
+                ledManager.setRedLEDState(!ledManager.getRedLEDState());
+            }
         }
     }
 
     bool isErrorState() const {
-        return errorState;
+        return errorState != ErrorState::NO_ERROR;
     }
 
 private:
     LEDManager& ledManager;
     Logger& logger;
-    bool errorState;
+    ErrorState errorState;
 };
 
 // SensorReader class
@@ -291,7 +325,7 @@ private:
 
     void initializeSensors() {
         if (!sensorInitializer.initializeSensors(mag, bme)) {
-            errorManager.handleError();
+            errorManager.handleError(ErrorManager::ErrorState::SENSOR_FAILURE);
         } else {
             indicateSuccessfulStartup();
         }

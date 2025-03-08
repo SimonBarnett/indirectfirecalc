@@ -3,15 +3,14 @@ public:
     void setup() {
         initialize();
         setLEDState(LED_OFF, LED_OFF);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), handleButtonInterrupt, FALLING);
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 
         if (!initializeSensors()) {
             handleSensorFailure();
         } else {
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
-
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), handleButtonInterrupt, FALLING);
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
     void loop() {
@@ -49,8 +48,7 @@ private:
         if (buttonPressed) {
             buttonPressed = false;
             delay(Constants::DEBOUNCE_DELAY_MS);
-            int buttonState = digitalRead(PinConfig::TRIGGER_BUTTON_PIN);
-            if (buttonState == LOW) {
+            if (digitalRead(PinConfig::TRIGGER_BUTTON_PIN) == LOW) {
                 onClick();
             }
         }
