@@ -48,22 +48,21 @@ public:
 // Logger class
 class Logger {
 public:
-    enum LogLevel {
+    enum class LogLevel {
         INFO,
         WARNING,
         ERROR
     };
 
-    Logger(LogOutput& output) : currentLogLevel(INFO), output(output) {}
+    Logger(LogOutput& output) : currentLogLevel(LogLevel::INFO), output(output) {}
 
     void begin(long baudRate) {
         output.begin(baudRate);
     }
 
-    void log(const char* message, LogLevel level = INFO) {
+    void log(const char* message, LogLevel level = LogLevel::INFO) {
         if (level >= currentLogLevel) {
-            const char* levelStr[] = {"[INFO] ", "[WARNING] ", "[ERROR] "};
-            output.print(levelStr[level]);
+            output.print(levelToString(level));
             output.println(message);
         }
     }
@@ -83,6 +82,15 @@ public:
 private:
     LogLevel currentLogLevel;
     LogOutput& output;
+
+    const char* levelToString(LogLevel level) {
+        switch (level) {
+            case LogLevel::INFO: return "[INFO] ";
+            case LogLevel::WARNING: return "[WARNING] ";
+            case LogLevel::ERROR: return "[ERROR] ";
+            default: return "";
+        }
+    }
 };
 
 // LED class
@@ -145,10 +153,10 @@ public:
                 if (bme.begin(Config::bme280Address)) {
                     return true;
                 } else {
-                    logger.log("BME280 initialization failed. Check the address and wiring.", Logger::ERROR);
+                    logger.log("BME280 initialization failed. Check the address and wiring.", Logger::LogLevel::ERROR);
                 }
             } else {
-                logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
+                logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::LogLevel::ERROR);
             }
             return false;
         }, 3, 1000);
@@ -177,7 +185,7 @@ public:
 
     void handleError() {
         errorState = true;
-        logger.log("Sensor failure", Logger::ERROR);
+        logger.log("Sensor failure", Logger::LogLevel::ERROR);
         ledManager.setRedLEDState(true);
     }
 
@@ -217,7 +225,7 @@ public:
         if (isReadingValid(readings, Config::numSensorData)) {
             logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
-            logger.log("Invalid sensor reading", Logger::WARNING);
+            logger.log("Invalid sensor reading", Logger::LogLevel::WARNING);
         }
     }
 
@@ -256,12 +264,7 @@ public:
         logger.begin(Config::baudRate);
         Wire.begin();
         ledManager.setup();
-
-        if (!sensorInitializer.initializeSensors(mag, bme)) {
-            errorManager.handleError();
-        } else {
-            indicateSuccessfulStartup();
-        }
+        initializeSensors();
     }
 
     void loop() {
@@ -285,6 +288,14 @@ private:
     SensorInitializer sensorInitializer;
     ErrorManager errorManager;
     SensorReader sensorReader;
+
+    void initializeSensors() {
+        if (!sensorInitializer.initializeSensors(mag, bme)) {
+            errorManager.handleError();
+        } else {
+            indicateSuccessfulStartup();
+        }
+    }
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);

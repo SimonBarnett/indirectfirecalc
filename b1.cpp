@@ -1,4 +1,4 @@
-#include <vector>
+#include <array>
 #include <map>
 #include <Adafruit_SSD1306.h>
 #include <RTC_DS3231.h>
@@ -24,6 +24,9 @@ namespace Config {
     constexpr float PRESSURE_CONSTANT_DRY_AIR = 287;
     constexpr float PRESSURE_CONSTANT_VAPOR = 461.5;
     constexpr float STANDARD_DENSITY = 1.225;
+    constexpr int MILS_PER_CIRCLE = 6400;
+    constexpr float TO_RADIANS = PI / 180;
+    constexpr float TO_MILS = MILS_PER_CIRCLE / (2 * PI);
 
     enum class PinConfig {
         UP_PIN = 3,
@@ -46,7 +49,7 @@ enum class WeaponType {
 
 struct WeaponProperties {
     float tof;
-    std::vector<float> velocities;
+    std::array<float, 5> velocities;
     int maxCharges;
 };
 
@@ -274,11 +277,10 @@ void handleDisplayNavigation() {
 }
 
 float toRadians(float degrees) {
-    return degrees * Config::PI / 180;
+    return degrees * Config::TO_RADIANS;
 }
 
 void MissionManager::recalculateAllMissions() {
-    if (missionCount == 0) return;  // Simplified check
     WeaponType weapon = getWeaponType();
     for (int i = 0; i < missionCount; ++i) {
         computeTarget(targets[i], missions[i], weapon);
@@ -324,8 +326,8 @@ float calculateRange(float x_t, float y_t, float density_factor) {
 }
 
 float calculateAzimuth(float x_t, float y_t) {
-    float azimuth = atan2(x_t, y_t) * (6400 / (2 * Config::PI));
-    if (azimuth < 0) azimuth += 6400;
+    float azimuth = atan2(x_t, y_t) * Config::TO_MILS;
+    if (azimuth < 0) azimuth += Config::MILS_PER_CIRCLE;
     return azimuth;
 }
 
@@ -345,9 +347,9 @@ float calculateElevation(float range, WeaponType weapon, int charge) {
     const auto& properties = weaponProperties.at(weapon);
     float v_chosen = properties.velocities[charge];
     if (weapon == WeaponType::TANK_120MM) {
-        return atan2(range, target.dist_target) * (6400 / (2 * Config::PI));
+        return atan2(range, target.dist_target) * Config::TO_MILS;
     } else {
-        return 0.5 * asin((range * Config::GRAVITY) / (v_chosen * v_chosen)) * (6400 / (2 * Config::PI));
+        return 0.5 * asin((range * Config::GRAVITY) / (v_chosen * v_chosen)) * Config::TO_MILS;
     }
 }
 
@@ -402,9 +404,21 @@ void setup() {
     setupRTC();
 }
 
-void loop() {
+void processSerialData(EnvironmentalDataManager &envManager) {
     readEnvData(envManager);
+}
+
+void processLoRaData() {
     readLoRaData();
-    handleWeaponTypeChange();
+}
+
+void navigateDisplay() {
     handleDisplayNavigation();
+}
+
+void loop() {
+    processSerialData(envManager);
+    processLoRaData();
+    handleWeaponTypeChange();
+    navigateDisplay();
 }
