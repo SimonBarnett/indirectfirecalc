@@ -16,6 +16,8 @@ constexpr int GREEN_LED_PIN = 9;
 constexpr int DEVICE_ID = 1; // S1=1, S2=2
 constexpr unsigned long RESPONSE_TIMEOUT = 500; // 500ms
 constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light in m/s
+constexpr float DEFAULT_DISTANCE = 3000.0;
+constexpr int SERIAL_BAUD_RATE = 9600;
 
 // Components
 SoftwareSerial loraSerial(LORA_RX_PIN, LORA_TX_PIN); 
@@ -29,9 +31,9 @@ public:
     : sensorsOperational(true) {}
 
   void setup() {
-    Serial.begin(9600);
-    loraSerial.begin(9600);
-    rangeSerial.begin(9600);
+    Serial.begin(SERIAL_BAUD_RATE);
+    loraSerial.begin(SERIAL_BAUD_RATE);
+    rangeSerial.begin(SERIAL_BAUD_RATE);
     Wire.begin();
 
     pinMode(TRIGGER_BUTTON_PIN, INPUT_PULLUP);
@@ -70,20 +72,7 @@ private:
       if (loraSerial.available()) {
         String response = loraSerial.readStringUntil('\n');
         if (response.startsWith("B1")) {
-          float b1Time = response.substring(3).toFloat();
-          float dist_B1 = getDistanceFromB1(b1Time);
-          float bearing_B1 = getBearingToBase();
-          float bearing_target = getBearingToTarget();
-          float dist_target = getDistanceToTarget();
-
-          if (isnan(bearing_B1) || isnan(bearing_target) || isnan(dist_target)) {
-            sensorsOperational = false;
-            setLEDs(HIGH, LOW);
-            return;
-          }
-
-          sendData(dist_B1, bearing_B1, bearing_target, dist_target);
-          success = true;
+          success = processResponse(response);
           break;
         }
       }
@@ -96,28 +85,42 @@ private:
     }
   }
 
+  bool processResponse(const String& response) {
+    float b1Time = response.substring(3).toFloat();
+    float dist_B1 = getDistanceFromB1(b1Time);
+    float bearing_B1 = getBearing();
+    float bearing_target = getBearing();
+    float dist_target = getDistanceToTarget();
+
+    if (isnan(bearing_B1) || isnan(bearing_target) || isnan(dist_target)) {
+      sensorsOperational = false;
+      setLEDs(HIGH, LOW);
+      return false;
+    }
+
+    sendData(dist_B1, bearing_B1, bearing_target, dist_target);
+    return true;
+  }
+
   float getDistanceFromB1(float b1Time) {
     float now = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
     return (now - b1Time) * SPEED_OF_LIGHT;
   }
 
-  float getBearing(bool toBase = false) {
-    sensors_event_t event;
-    mag.getEvent(&event);
-    float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
-    if (heading < 0) heading += 360;
-    return heading;
+  float getBearing() {
+      sensors_event_t event;
+      mag.getEvent(&event);
+      float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
+      if (heading < 0) heading += 360;
+      return heading;
   }
-
-  float getBearingToBase() { return getBearing(true); }
-  float getBearingToTarget() { return getBearing(false); }
 
   float getDistanceToTarget() {
     rangeSerial.println("RANGE");
     if (rangeSerial.available()) {
       return rangeSerial.readStringUntil('\n').toFloat();
     }
-    return 3000.0;
+    return DEFAULT_DISTANCE;
   }
 
   void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
@@ -140,26 +143,23 @@ private:
   }
 
   bool initializeSensors() {
-    if (!mag.begin() || !rtc.begin()) {
-      return false;
-    }
-    return true;
+    return mag.begin() && rtc.begin();
   }
 
   void sensorFailure() {
     sensorsOperational = false;
     setLEDs(HIGH, LOW);
     Serial.println("Sensor failure");
-    while (1);
+    while (true);
   }
 };
 
-SensorSystem sensorSystem;
-
 void setup() {
+  SensorSystem sensorSystem;
   sensorSystem.setup();
 }
 
 void loop() {
+  SensorSystem sensorSystem;
   sensorSystem.loop();
 }
