@@ -20,6 +20,10 @@ namespace Config {
 
     constexpr float PI = 3.14159265358979323846;
     constexpr float GRAVITY = 9.81;
+    constexpr float TEMPERATURE_CONVERSION = 273.15;
+    constexpr float PRESSURE_CONSTANT_DRY_AIR = 287;
+    constexpr float PRESSURE_CONSTANT_VAPOR = 461.5;
+    constexpr float STANDARD_DENSITY = 1.225;
 
     enum class PinConfig {
         UP_PIN = 3,
@@ -210,7 +214,7 @@ void setupRTC() {
     }
 }
 
-void updateLEDAndRecalculate() {
+void updateLEDAndRecalculate(EnvironmentalDataManager &envManager) {
     if (envManager.isValid()) {
         setLEDState(false, true);
         manager.recalculateAllMissions();
@@ -219,12 +223,17 @@ void updateLEDAndRecalculate() {
     }
 }
 
-void readEnvData() {
+void readEnvData(EnvironmentalDataManager &envManager) {
     if (Serial.available()) {
         String envData = Serial.readStringUntil('\n');
         auto tokens = splitString(envData.c_str(), ',');
-        envManager.updateEnvData(tokens);
-        updateLEDAndRecalculate();
+        if (tokens.size() >= 5) {
+            envManager.updateEnvData(tokens);
+            updateLEDAndRecalculate(envManager);
+        } else {
+            Serial.println("Invalid environmental data received");
+            setLEDState(true, false);
+        }
     } else if (!envManager.isValid()) {
         setLEDState(true, false);
     }
@@ -239,7 +248,7 @@ void readLoRaData() {
             return;
         }
         // Extract target data and process...
-        updateLEDAndRecalculate();
+        updateLEDAndRecalculate(envManager);
     }
 }
 
@@ -303,11 +312,11 @@ Coordinates calculateTargetCoordinates(const TargetData& target) {
 }
 
 float calculateDensityFactor() {
-    float temp_k = envManager.data.temp + 273.15;
+    float temp_k = envManager.data.temp + Config::TEMPERATURE_CONVERSION;
     float pv = (envManager.data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.data.temp) / (237.3 + envManager.data.temp));
     float pd = envManager.data.pressure - pv;
-    float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
-    return 1.225 / density;
+    float density = (pd * 100 / (Config::PRESSURE_CONSTANT_DRY_AIR * temp_k)) + (pv * 100 / (Config::PRESSURE_CONSTANT_VAPOR * temp_k));
+    return Config::STANDARD_DENSITY / density;
 }
 
 float calculateRange(float x_t, float y_t, float density_factor) {
@@ -394,7 +403,7 @@ void setup() {
 }
 
 void loop() {
-    readEnvData();
+    readEnvData(envManager);
     readLoRaData();
     handleWeaponTypeChange();
     handleDisplayNavigation();

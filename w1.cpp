@@ -288,7 +288,8 @@ private:
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        while (!delayNonBlocking(Config::initDelayMs)) {
+        unsigned long startMillis = millis();
+        while (millis() - startMillis < Config::initDelayMs) {
             // Do nothing, just wait
         }
         ledManager.setGreenLEDState(false);
@@ -296,15 +297,6 @@ private:
 
     bool shouldUpdate(unsigned long currentMillis) {
         return (currentMillis - lastUpdateMillis) >= Config::updateIntervalMs;
-    }
-
-    bool delayNonBlocking(unsigned long delayMs) {
-        static unsigned long startMillis = millis();
-        if (millis() - startMillis < delayMs) {
-            return false; // Still waiting
-        }
-        startMillis = millis(); // Reset start time
-        return true; // Delay complete
     }
 };
 
