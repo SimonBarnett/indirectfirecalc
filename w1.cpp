@@ -37,18 +37,20 @@ public:
     }
 
     static void log(const char* message, LogLevel level = INFO) {
-        switch (level) {
-            case INFO:
-                Serial.print("[INFO] ");
-                break;
-            case WARNING:
-                Serial.print("[WARNING] ");
-                break;
-            case ERROR:
-                Serial.print("[ERROR] ");
-                break;
+        if (level >= currentLogLevel) {
+            switch (level) {
+                case INFO:
+                    Serial.print("[INFO] ");
+                    break;
+                case WARNING:
+                    Serial.print("[WARNING] ");
+                    break;
+                case ERROR:
+                    Serial.print("[ERROR] ");
+                    break;
+            }
+            Serial.println(message);
         }
-        Serial.println(message);
     }
 
     static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
@@ -58,7 +60,17 @@ public:
         Serial.print("Temperature: "); Serial.print(temp); Serial.print(", ");
         Serial.print("Humidity: "); Serial.println(humidity);
     }
+
+    static void setLogLevel(LogLevel level) {
+        currentLogLevel = level;
+    }
+
+private:
+    static LogLevel currentLogLevel;
 };
+
+// Define the static member variable
+Logger::LogLevel Logger::currentLogLevel = Logger::INFO;
 
 // LED Manager class
 class LEDManager {
@@ -129,11 +141,11 @@ private:
 
     bool initializeSensors() {
         if (!mag.begin()) {
-            logger.log("Magnetometer initialization failed", Logger::ERROR);
+            logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
             return false;
         }
         if (!bme.begin(Config::bme280Address)) {
-            logger.log("BME280 initialization failed", Logger::ERROR);
+            logger.log("BME280 initialization failed. Check the address and wiring.", Logger::ERROR);
             return false;
         }
         return true;

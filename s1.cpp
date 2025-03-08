@@ -29,19 +29,16 @@ namespace Constants {
     constexpr int DATA_BUFFER_SIZE = 128;
     constexpr char MAG_INIT_FAIL_MSG[] = "Magnetometer initialization failed!";
     constexpr char RTC_INIT_FAIL_MSG[] = "RTC initialization failed!";
-    constexpr int MAGNETOMETER_ID = 12345;  // Replacing magic number
+    constexpr int MAGNETOMETER_ID = 12345;  
 }
 
 // Components
 class SensorSystem {
 public:
-    SensorSystem()
-        : loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN),
-          rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN),
-          mag(Constants::MAGNETOMETER_ID),
-          sensorsOperational(true),
-          lastFlashTime(0), 
-          flashing(false) {}
+    static SensorSystem& getInstance() {
+        static SensorSystem instance;
+        return instance;
+    }
 
     void setup() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
@@ -57,7 +54,7 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { instance->onClickISR(); }, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { getInstance().onClickISR(); }, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
@@ -79,7 +76,13 @@ private:
     int flashPin;
     int flashDuration;
 
-    static SensorSystem* instance;
+    SensorSystem()
+        : loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN),
+          rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN),
+          mag(Constants::MAGNETOMETER_ID),
+          sensorsOperational(true),
+          lastFlashTime(0), 
+          flashing(false) {}
 
     void onClick() {
         if (!sensorsOperational) return;
@@ -95,7 +98,7 @@ private:
     }
 
     void onClickISR() {
-        instance->onClick();
+        onClick();
     }
 
     void sendRequest(const DateTime& requestTime) {
@@ -219,14 +222,10 @@ private:
     }
 };
 
-// SensorSystem instance managed locally in setup and loop
-SensorSystem* SensorSystem::instance = nullptr;
-
 void setup() {
-    SensorSystem::instance = new SensorSystem();
-    SensorSystem::instance->setup();
+    SensorSystem::getInstance().setup();
 }
 
 void loop() {
-    SensorSystem::instance->loop();
+    SensorSystem::getInstance().loop();
 }

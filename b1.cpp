@@ -6,7 +6,6 @@
 #include <string>
 #include <sstream>
 #include <cmath>
-#include <optional>
 
 namespace Config {
     constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
@@ -135,22 +134,30 @@ struct FireMission {
     float elevation; // mils
 };
 
+struct EnvironmentalData {
+    float wind_speed = 0.0;
+    float wind_dir = 0.0;
+    float pressure = 1013.25;
+    float temp = 20.0;
+    float humidity = 50.0;
+};
+
 class EnvironmentalDataManager {
 public:
-    std::optional<float> wind_speed, wind_dir, pressure, temp, humidity;
+    EnvironmentalData data;
 
     void updateEnvData(const std::vector<std::string>& tokens) {
         if (tokens.size() >= 5) {
-            wind_speed = std::stof(tokens[0]);
-            wind_dir = std::stof(tokens[1]);
-            pressure = std::stof(tokens[2]);
-            temp = std::stof(tokens[3]);
-            humidity = std::stof(tokens[4]);
+            data.wind_speed = std::stof(tokens[0]);
+            data.wind_dir = std::stof(tokens[1]);
+            data.pressure = std::stof(tokens[2]);
+            data.temp = std::stof(tokens[3]);
+            data.humidity = std::stof(tokens[4]);
         }
     }
 
     bool isValid() const {
-        return wind_speed && wind_dir && pressure && temp && humidity;
+        return true; // All values have default initialization, always valid
     }
 };
 
@@ -173,20 +180,16 @@ public:
 MissionManager manager;
 
 void setupPins() {
-    const int inputPins[] = {
+    const int pins[] = {
         static_cast<int>(Config::PinConfig::UP_PIN), static_cast<int>(Config::PinConfig::DOWN_PIN), 
-        static_cast<int>(Config::PinConfig::SWITCH_81MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_155MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_120MM_PIN)
-    };
-    const int outputPins[] = {static_cast<int>(Config::PinConfig::RED_LED_PIN), static_cast<int>(Config::PinConfig::GREEN_LED_PIN)};
-
-    auto setPinMode = [](const int pins[], int mode) {
-        for (auto pin : pins) {
-            pinMode(pin, mode);
-        }
+        static_cast<int>(Config::PinConfig::SWITCH_81MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_155MM_PIN), 
+        static_cast<int>(Config::PinConfig::SWITCH_120MM_PIN), static_cast<int>(Config::PinConfig::RED_LED_PIN), 
+        static_cast<int>(Config::PinConfig::GREEN_LED_PIN)
     };
 
-    setPinMode(inputPins, INPUT_PULLUP);
-    setPinMode(outputPins, OUTPUT);
+    for (auto pin : pins) {
+        pinMode(pin, (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
+    }
     setLEDState(true, false); // Red on until W1 connects
 }
 
@@ -285,15 +288,15 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
 
-    float temp_k = envManager.temp.value_or(20.0) + 273.15;
-    float pv = (envManager.humidity.value_or(50.0) / 100.0) * 6.1078 * pow(10, (7.5 * envManager.temp.value_or(20.0)) / (237.3 + envManager.temp.value_or(20.0)));
-    float pd = envManager.pressure.value_or(1013.25) - pv;
+    float temp_k = envManager.data.temp + 273.15;
+    float pv = (envManager.data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.data.temp) / (237.3 + envManager.data.temp));
+    float pd = envManager.data.pressure - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = toRadians(envManager.wind_dir.value_or(0.0));
-    float wind_x = envManager.wind_speed.value_or(0.0) * cos(wind_rad);
-    float wind_y = envManager.wind_speed.value_or(0.0) * sin(wind_rad);
+    float wind_rad = toRadians(envManager.data.wind_dir);
+    float wind_x = envManager.data.wind_speed * cos(wind_rad);
+    float wind_y = envManager.data.wind_speed * sin(wind_rad);
 
     const WeaponProperties& properties = weaponProperties.at(weapon);
     x_t += wind_x * properties.tof;
