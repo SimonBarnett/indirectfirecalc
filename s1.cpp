@@ -1,7 +1,7 @@
 class SensorSystem {
 public:
     void setup() {
-        initialize();
+        initializeSystem();
         configureInterrupts();
         adjustRTC();
 
@@ -11,11 +11,11 @@ public:
             indicateSuccess();
         }
     }
-    
+
     void loop() {
         handleButtonPress();
         if (!sensorsOperational) {
-            setLEDState(LED_ON, LED_OFF);
+            setLEDState(LEDState::ON, LEDState::OFF);
         }
         handleFlashLED();
     }
@@ -32,7 +32,7 @@ private:
     int flashDuration;
     volatile bool buttonPressed{false};
 
-    void initialize() {
+    void initializeSystem() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
         initializeSerialPorts();
         Wire.begin();
@@ -107,7 +107,7 @@ private:
 
         if (isnan(bearing_B1) || isnan(bearing_target) || isnan(dist_target)) {
             sensorsOperational = false;
-            setLEDState(LED_ON, LED_OFF);
+            setLEDState(LEDState::ON, LEDState::OFF);
             return false;
         }
 
@@ -146,11 +146,11 @@ private:
         loraSerial.println(buffer);
     }
 
-    enum LEDState { LED_OFF = LOW, LED_ON = HIGH };
+    enum class LEDState { OFF = LOW, ON = HIGH };
 
     void setLEDState(LEDState redState, LEDState greenState) {
-        digitalWrite(PinConfig::RED_LED_PIN, redState);
-        digitalWrite(PinConfig::GREEN_LED_PIN, greenState);
+        digitalWrite(PinConfig::RED_LED_PIN, static_cast<int>(redState));
+        digitalWrite(PinConfig::GREEN_LED_PIN, static_cast<int>(greenState));
     }
 
     void configurePin(int pin, int mode, int state = LOW) {
@@ -181,11 +181,11 @@ private:
 
         const unsigned long currentTime = millis();
         if (currentTime - lastFlashTime >= flashDuration) {
-            digitalWrite(flashPin, LED_OFF);
+            digitalWrite(flashPin, LOW);
             flashing = false;
         } else {
             const bool isBlinkOn = (currentTime / Constants::LED_BLINK_INTERVAL_MS) % 2 == 0;
-            digitalWrite(flashPin, isBlinkOn ? LED_ON : LED_OFF);
+            digitalWrite(flashPin, isBlinkOn ? HIGH : LOW);
         }
     }
 
@@ -204,12 +204,12 @@ private:
     void reportError(const char* errorMsg) {
         Serial.println(errorMsg);
         sensorsOperational = false;
-        setLEDState(LED_ON, LED_OFF);
+        setLEDState(LEDState::ON, LEDState::OFF);
     }
 
     void handleSensorFailure() {
         sensorsOperational = false;
-        setLEDState(LED_ON, LED_OFF);
+        setLEDState(LEDState::ON, LEDState::OFF);
         Serial.println("Sensor failure. Attempting to recover...");
 
         for (int i = 0; i < Constants::RETRY_ATTEMPTS; ++i) {
