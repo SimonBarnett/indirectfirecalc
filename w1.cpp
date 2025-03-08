@@ -20,6 +20,7 @@ struct Config {
 constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
 constexpr int NUM_SENSOR_DATA = 5;
+constexpr float PRESSURE_CONVERSION_FACTOR = 100.0;
 
 // Logger class
 class Logger {
@@ -71,7 +72,7 @@ private:
 class SensorManager {
 public:
     SensorManager()
-        : mag(Config::magSensorId), bme(), lastUpdate(0), errorState(false),
+        : mag(Config::magSensorId), bme(), lastUpdateMillis(0), errorState(false),
           ledManager(Config::sensorFailRedPin, Config::sensorOkGreenPin) {}
 
     void setup() {
@@ -89,7 +90,7 @@ public:
     void loop() {
         unsigned long currentMillis = millis();
         if (shouldUpdate(currentMillis)) {
-            lastUpdate = currentMillis;
+            lastUpdateMillis = currentMillis;
             updateSensorReadings();
         }
     }
@@ -97,7 +98,7 @@ public:
 private:
     Adafruit_HMC5883_Unified mag;
     Adafruit_BME280 bme;
-    unsigned long lastUpdate;
+    unsigned long lastUpdateMillis;
     bool errorState;
     LEDManager ledManager;
 
@@ -121,7 +122,6 @@ private:
         unsigned long startMillis = millis();
         while (millis() - startMillis < Config::blinkIntervalMs) {
             ledManager.setRedLEDState(!ledManager.getRedLEDState());
-            delay(Config::blinkIntervalMs);
         }
         ledManager.setRedLEDState(false);
     }
@@ -135,7 +135,7 @@ private:
     void updateSensorReadings() {
         float speed = getWindSpeed();
         float dir = getWindDirection();
-        float pressure = bme.readPressure() / 100.0;
+        float pressure = bme.readPressure() / PRESSURE_CONVERSION_FACTOR;
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
@@ -160,7 +160,7 @@ private:
     }
 
     bool shouldUpdate(unsigned long currentMillis) {
-        return (currentMillis - lastUpdate) >= UPDATE_INTERVAL_MS;
+        return (currentMillis - lastUpdateMillis) >= UPDATE_INTERVAL_MS;
     }
 
     bool isReadingValid(float speed, float dir, float pressure, float temp, float humidity) {

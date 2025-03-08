@@ -30,15 +30,15 @@ namespace Constants {
 }
 
 // Components
-SoftwareSerial loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN); 
-SoftwareSerial rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN); 
-Adafruit_HMC5883_Unified mag(12345);
-RTC_DS3231 rtc;
-
 class SensorSystem {
 public:
-    SensorSystem(SoftwareSerial& lora, SoftwareSerial& range, Adafruit_HMC5883_Unified& magnetometer, RTC_DS3231& clock)
-        : loraSerial(lora), rangeSerial(range), mag(magnetometer), rtc(clock), sensorsOperational(true), lastFlashTime(0), flashing(false) {}
+    SensorSystem()
+        : loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN),
+          rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN),
+          mag(12345),
+          sensorsOperational(true),
+          lastFlashTime(0), 
+          flashing(false) {}
 
     void setup() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
@@ -55,7 +55,7 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), [this]() { this->onClick(); }, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), SensorSystem::onClickISR, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
@@ -67,10 +67,10 @@ public:
     }
 
 private:
-    SoftwareSerial& loraSerial;
-    SoftwareSerial& rangeSerial;
-    Adafruit_HMC5883_Unified& mag;
-    RTC_DS3231& rtc;
+    SoftwareSerial loraSerial;
+    SoftwareSerial rangeSerial;
+    Adafruit_HMC5883_Unified mag;
+    RTC_DS3231 rtc;
     bool sensorsOperational;
     unsigned long lastFlashTime;
     bool flashing;
@@ -204,9 +204,13 @@ private:
         pinMode(PinConfig::RED_LED_PIN, OUTPUT);
         pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
     }
+
+    static void onClickISR() {
+        sensorSystem.onClick();
+    }
 };
 
-SensorSystem sensorSystem(loraSerial, rangeSerial, mag, rtc);
+SensorSystem sensorSystem;
 
 void setup() {
     sensorSystem.setup();

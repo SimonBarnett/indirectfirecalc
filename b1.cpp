@@ -1,4 +1,3 @@
-#include <Wire.h>
 #include <vector>
 #include <map>
 #include <Adafruit_SSD1306.h>
@@ -135,14 +134,31 @@ struct FireMission {
     float elevation; // mils
 };
 
+class EnvironmentalDataManager {
+public:
+    float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
+    bool envDataValid = false;
+
+    void updateEnvData(const std::vector<std::string>& tokens) {
+        if (tokens.size() >= 5) {
+            wind_speed = std::stof(tokens[0]);
+            wind_dir = std::stof(tokens[1]);
+            pressure = std::stof(tokens[2]);
+            temp = std::stof(tokens[3]);
+            humidity = std::stof(tokens[4]);
+            envDataValid = true;
+        }
+    }
+};
+
+EnvironmentalDataManager envManager;
+
 class MissionManager {
 public:
     std::array<TargetData, Config::MAX_MISSIONS> targets{};
     std::array<FireMission, Config::MAX_MISSIONS> missions{};
     int missionCount = 0;
     int displayStart = 0;
-    float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
-    bool envDataValid = false;
     WeaponType lastWeapon = MORTAR_81MM;
 
     void recalculateAllMissions();
@@ -160,12 +176,14 @@ void setupPins() {
     };
     const int outputPins[] = {Config::RED_LED_PIN, Config::GREEN_LED_PIN};
 
-    for (int pin : inputPins) {
-        pinMode(pin, INPUT_PULLUP);
-    }
-    for (int pin : outputPins) {
-        pinMode(pin, OUTPUT);
-    }
+    auto setPinMode = [](const int pins[], int mode) {
+        for (int pin : pins) {
+            pinMode(pin, mode);
+        }
+    };
+
+    setPinMode(inputPins, INPUT_PULLUP);
+    setPinMode(outputPins, OUTPUT);
     setLEDState(true, false); // Red on until W1 connects
 }
 
@@ -182,17 +200,12 @@ void readEnvData() {
     if (Serial.available()) {
         std::string envData = Serial.readStringUntil('\n').c_str();
         auto tokens = splitString(envData, ',');
-        if (tokens.size() >= 5) {
-            manager.wind_speed = std::stof(tokens[0]);
-            manager.wind_dir = std::stof(tokens[1]);
-            manager.pressure = std::stof(tokens[2]);
-            manager.temp = std::stof(tokens[3]);
-            manager.humidity = std::stof(tokens[4]);
-            manager.envDataValid = true;
+        envManager.updateEnvData(tokens);
+        if (envManager.envDataValid) {
             setLEDState(false, true);
             manager.recalculateAllMissions();
         }
-    } else if (!manager.envDataValid) {
+    } else if (!envManager.envDataValid) {
         setLEDState(true, false);
     }
 }
@@ -248,7 +261,7 @@ void handleDisplayNavigation() {
 }
 
 void MissionManager::recalculateAllMissions() {
-    if (!envDataValid && missionCount == 0) return;
+    if (!envManager.envDataValid && missionCount == 0) return;
     WeaponType weapon = getWeaponType();
     for (int i = 0; i < missionCount; i++) {
         computeTarget(targets[i], missions[i], weapon);
@@ -265,15 +278,15 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
 
-    float temp_k = temp + 273.15;
-    float pv = (humidity / 100.0) * 6.1078 * pow(10, (7.5 * temp) / (237.3 + temp));
-    float pd = pressure - pv;
+    float temp_k = envManager.temp + 273.15;
+    float pv = (envManager.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.temp) / (237.3 + envManager.temp));
+    float pd = envManager.pressure - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = wind_dir * Config::PI / 180;
-    float wind_x = wind_speed * cos(wind_rad);
-    float wind_y = wind_speed * sin(wind_rad);
+    float wind_rad = envManager.wind_dir * Config::PI / 180;
+    float wind_x = envManager.wind_speed * cos(wind_rad);
+    float wind_y = envManager.wind_speed * sin(wind_rad);
 
     const WeaponProperties& properties = weaponProperties.at(weapon);
     x_t += wind_x * properties.tof;
