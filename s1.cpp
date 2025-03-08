@@ -2,17 +2,16 @@ class SensorSystem {
 public:
     void setup() {
         initialize();
-        setLEDState(LED_OFF, LED_OFF);
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), handleButtonInterrupt, FALLING);
-        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        configureInterrupts();
+        adjustRTC();
 
         if (!initializeSensors()) {
             handleSensorFailure();
         } else {
-            startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
+            indicateSuccess();
         }
     }
-
+    
     void loop() {
         handleButtonPress();
         if (!sensorsOperational) {
@@ -31,7 +30,7 @@ private:
     bool flashing{false};
     int flashPin;
     int flashDuration;
-    static volatile bool buttonPressed;
+    volatile bool buttonPressed{false};
 
     void initialize() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
@@ -40,8 +39,16 @@ private:
         configurePins();
     }
 
-    static void handleButtonInterrupt() {
-        buttonPressed = true;
+    void configureInterrupts() {
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), [this]() { buttonPressed = true; }, FALLING);
+    }
+
+    void adjustRTC() {
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+    }
+
+    void indicateSuccess() {
+        startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
     }
 
     void handleButtonPress() {
@@ -217,8 +224,6 @@ private:
         Serial.println("Sensor recovery failed.");
     }
 };
-
-volatile bool SensorSystem::buttonPressed = false;
 
 SensorSystem sensorSystem;
 

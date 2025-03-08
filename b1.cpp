@@ -6,28 +6,34 @@
 #include <string>
 #include <sstream>
 #include <cmath>
+#include <string_view>
 
 namespace Config {
-    constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
+    namespace Physics {
+        constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
+        constexpr float PI = 3.14159265358979323846;
+        constexpr float GRAVITY = 9.81;
+        constexpr float TEMPERATURE_CONVERSION = 273.15;
+        constexpr float PRESSURE_CONSTANT_DRY_AIR = 287;
+        constexpr float PRESSURE_CONSTANT_VAPOR = 461.5;
+        constexpr float STANDARD_DENSITY = 1.225;
+        constexpr float TO_RADIANS = PI / 180;
+        constexpr float TO_MILS = MILS_PER_CIRCLE / (2 * PI);
+    }
+
+    namespace Display {
+        constexpr int SCREEN_WIDTH = 128;
+        constexpr int SCREEN_HEIGHT = 64;
+        constexpr int BAUD_RATE = 9600;
+        constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
+        constexpr int DISPLAY_FAILURE_DELAY = 5000; // Delay in milliseconds
+        constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
+        constexpr int DISPLAY_LINES = 4;
+    }
+
     constexpr int MAX_MISSIONS = 10;
-    constexpr int SCREEN_WIDTH = 128;
-    constexpr int SCREEN_HEIGHT = 64;
-    constexpr int BAUD_RATE = 9600;
-    constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
-    constexpr int DISPLAY_FAILURE_DELAY = 5000; // Delay in milliseconds
-    constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
-    constexpr int DISPLAY_LINES = 4;
-
-    constexpr float PI = 3.14159265358979323846;
-    constexpr float GRAVITY = 9.81;
-    constexpr float TEMPERATURE_CONVERSION = 273.15;
-    constexpr float PRESSURE_CONSTANT_DRY_AIR = 287;
-    constexpr float PRESSURE_CONSTANT_VAPOR = 461.5;
-    constexpr float STANDARD_DENSITY = 1.225;
     constexpr int MILS_PER_CIRCLE = 6400;
-    constexpr float TO_RADIANS = PI / 180;
-    constexpr float TO_MILS = MILS_PER_CIRCLE / (2 * PI);
-
+    
     enum class PinConfig {
         UP_PIN = 3,
         DOWN_PIN = 4,
@@ -53,19 +59,26 @@ struct WeaponProperties {
     int maxCharges;
 };
 
-const std::map<WeaponType, WeaponProperties> weaponProperties = {
-    {WeaponType::MORTAR_81MM, {10.0, {70, 120, 170, 210, 250}, 5}},
-    {WeaponType::ARTILLERY_155MM, {20.0, {300, 450, 600, 750, 827}, 5}},
-    {WeaponType::TANK_120MM, {1.0, {1700}, 1}}
+constexpr WeaponProperties weaponProperties[] = {
+    {10.0, {70, 120, 170, 210, 250}, 5},
+    {20.0, {300, 450, 600, 750, 827}, 5},
+    {1.0, {1700}, 1}
 };
+
+constexpr WeaponProperties getWeaponProperties(WeaponType weapon) {
+    return weaponProperties[static_cast<int>(weapon)];
+}
 
 std::vector<std::string> splitString(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
-    std::stringstream ss(str);
-    std::string token;
-    while (std::getline(ss, token, delimiter)) {
-        tokens.emplace_back(std::move(token));
+    size_t start = 0;
+    size_t end = str.find(delimiter);
+    while (end != std::string::npos) {
+        tokens.emplace_back(str.substr(start, end - start));
+        start = end + 1;
+        end = str.find(delimiter, start);
     }
+    tokens.emplace_back(str.substr(start));
     return tokens;
 }
 
@@ -77,9 +90,9 @@ public:
         : display(screenWidth, screenHeight, &twi, rst_pin) {}
 
     void setup() {
-        if (!display.begin(SSD1306_SWITCHCAPVCC, Config::DISPLAY_I2C_ADDRESS)) {
+        if (!display.begin(SSD1306_SWITCHCAPVCC, Config::Display::DISPLAY_I2C_ADDRESS)) {
             Serial.println("Display failure");
-            delay(Config::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+            delay(Config::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
         } else {
             initializeDisplay();
         }
@@ -115,7 +128,7 @@ public:
     }
 };
 
-DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Wire, -1);
+DisplayManager displayManager(Config::Display::SCREEN_WIDTH, Config::Display::SCREEN_HEIGHT, Wire, -1);
 
 RTC_DS3231 rtc;
 SoftwareSerial loraSerial(static_cast<int>(Config::PinConfig::LORA_RX_PIN), static_cast<int>(Config::PinConfig::LORA_TX_PIN));
@@ -156,11 +169,10 @@ public:
     void updateEnvData(const std::vector<std::string>& tokens) {
         if (tokens.size() >= 5) {
             try {
-                data.wind_speed = std::stof(tokens[0]);
-                data.wind_dir = std::stof(tokens[1]);
-                data.pressure = std::stof(tokens[2]);
-                data.temp = std::stof(tokens[3]);
-                data.humidity = std::stof(tokens[4]);
+                float* dataPtr[] = { &data.wind_speed, &data.wind_dir, &data.pressure, &data.temp, &data.humidity };
+                for (size_t i = 0; i < 5; ++i) {
+                    *dataPtr[i] = std::stof(tokens[i]);
+                }
             } catch (const std::invalid_argument& e) {
                 Serial.println("Invalid environmental data format");
             }
@@ -201,9 +213,9 @@ void setupPins() {
         Config::PinConfig::GREEN_LED_PIN
     };
 
-    for (const auto& pin : pins) {
+    std::for_each(pins.begin(), pins.end(), [](const Config::PinConfig& pin) {
         pinMode(static_cast<int>(pin), (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
-    }
+    });
 
     setLEDState(true, false); // Red on until W1 connects
 }
@@ -211,7 +223,7 @@ void setupPins() {
 void setupRTC() {
     if (!rtc.begin()) {
         Serial.println("RTC failure");
-        delay(Config::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+        delay(Config::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
     } else {
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
@@ -247,11 +259,23 @@ void readLoRaData() {
         String data = loraSerial.readStringUntil('\n');
         auto tokens = splitString(data.c_str(), ',');
         if (tokens.size() < 6) {
-            Serial.println("Invalid LoRa data received");
+            Serial.println("Invalid LoRa data received: " + data);
             return;
         }
         // Extract target data and process...
-        updateLEDAndRecalculate(envManager);
+        try {
+            // Assuming tokens[0] to tokens[5] contain valid target data
+            TargetData target;
+            target.id = std::stoi(tokens[0]);
+            target.dist_B1 = std::stof(tokens[1]);
+            target.bearing_B1 = std::stof(tokens[2]);
+            target.bearing_target = std::stof(tokens[3]);
+            target.dist_target = std::stof(tokens[4]);
+            // Process target data...
+            updateLEDAndRecalculate(envManager);
+        } catch (const std::invalid_argument& e) {
+            Serial.println("Invalid target data format: " + data);
+        }
     }
 }
 
@@ -267,17 +291,17 @@ void handleDisplayNavigation() {
     if (digitalRead(static_cast<int>(Config::PinConfig::UP_PIN)) == LOW && manager.displayStart > 0) {
         manager.displayStart--;
         manager.displayFireMissions();
-        delay(Config::DEBOUNCE_DELAY);
+        delay(Config::Display::DEBOUNCE_DELAY);
     }
-    if (digitalRead(static_cast<int>(Config::PinConfig::DOWN_PIN)) == LOW && manager.displayStart + Config::DISPLAY_LINES < manager.missionCount) {
+    if (digitalRead(static_cast<int>(Config::PinConfig::DOWN_PIN)) == LOW && manager.displayStart + Config::Display::DISPLAY_LINES < manager.missionCount) {
         manager.displayStart++;
         manager.displayFireMissions();
-        delay(Config::DEBOUNCE_DELAY);
+        delay(Config::Display::DEBOUNCE_DELAY);
     }
 }
 
 float toRadians(float degrees) {
-    return degrees * Config::TO_RADIANS;
+    return degrees * Config::Physics::TO_RADIANS;
 }
 
 void MissionManager::recalculateAllMissions() {
@@ -314,11 +338,11 @@ Coordinates calculateTargetCoordinates(const TargetData& target) {
 }
 
 float calculateDensityFactor() {
-    float temp_k = envManager.data.temp + Config::TEMPERATURE_CONVERSION;
+    float temp_k = envManager.data.temp + Config::Physics::TEMPERATURE_CONVERSION;
     float pv = (envManager.data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.data.temp) / (237.3 + envManager.data.temp));
     float pd = envManager.data.pressure - pv;
-    float density = (pd * 100 / (Config::PRESSURE_CONSTANT_DRY_AIR * temp_k)) + (pv * 100 / (Config::PRESSURE_CONSTANT_VAPOR * temp_k));
-    return Config::STANDARD_DENSITY / density;
+    float density = (pd * 100 / (Config::Physics::PRESSURE_CONSTANT_DRY_AIR * temp_k)) + (pv * 100 / (Config::Physics::PRESSURE_CONSTANT_VAPOR * temp_k));
+    return Config::Physics::STANDARD_DENSITY / density;
 }
 
 float calculateRange(float x_t, float y_t, float density_factor) {
@@ -326,15 +350,15 @@ float calculateRange(float x_t, float y_t, float density_factor) {
 }
 
 float calculateAzimuth(float x_t, float y_t) {
-    float azimuth = atan2(x_t, y_t) * Config::TO_MILS;
+    float azimuth = atan2(x_t, y_t) * Config::Physics::TO_MILS;
     if (azimuth < 0) azimuth += Config::MILS_PER_CIRCLE;
     return azimuth;
 }
 
 int determineCharge(float range, WeaponType weapon) {
-    const auto& properties = weaponProperties.at(weapon);
+    const auto& properties = getWeaponProperties(weapon);
     for (int i = 0; i < properties.maxCharges; ++i) {
-        float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::GRAVITY;
+        float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::Physics::GRAVITY;
         if (weapon == WeaponType::TANK_120MM) max_range = 5000;
         if (range <= max_range * 1.1) {
             return i;
@@ -344,19 +368,19 @@ int determineCharge(float range, WeaponType weapon) {
 }
 
 float calculateElevation(float range, WeaponType weapon, int charge) {
-    const auto& properties = weaponProperties.at(weapon);
+    const auto& properties = getWeaponProperties(weapon);
     float v_chosen = properties.velocities[charge];
     if (weapon == WeaponType::TANK_120MM) {
-        return atan2(range, target.dist_target) * Config::TO_MILS;
+        return atan2(range, target.dist_target) * Config::Physics::TO_MILS;
     } else {
-        return 0.5 * asin((range * Config::GRAVITY) / (v_chosen * v_chosen)) * Config::TO_MILS;
+        return 0.5 * asin((range * Config::Physics::GRAVITY) / (v_chosen * v_chosen)) * Config::Physics::TO_MILS;
     }
 }
 
 void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
     auto coordinates = calculateTargetCoordinates(target);
     auto density_factor = calculateDensityFactor();
-    computeWindAdjustedTarget(coordinates.x, coordinates.y, target, weaponProperties.at(weapon));
+    computeWindAdjustedTarget(coordinates.x, coordinates.y, target, getWeaponProperties(weapon));
     mission.range = calculateRange(coordinates.x, coordinates.y, density_factor);
     mission.azimuth = calculateAzimuth(coordinates.x, coordinates.y);
     mission.charge = determineCharge(mission.range, weapon);
@@ -369,7 +393,7 @@ void MissionManager::displayFireMissions() const {
     WeaponType weapon = getWeaponType();
     std::string weaponLabel = (weapon == WeaponType::MORTAR_81MM) ? "81mm Mortar" : (weapon == WeaponType::ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
     displayManager.println("Weapon: " + weaponLabel);
-    for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; ++i) {
+    for (int i = displayStart; i < missionCount && i < displayStart + Config::Display::DISPLAY_LINES; ++i) {
         displayManager.print("FM "); displayManager.print(std::to_string(missions[i].id));
         displayManager.print(": Chg "); displayManager.print(std::to_string(missions[i].charge));
         displayManager.print(", Azi "); displayManager.print(std::to_string(static_cast<int>(missions[i].azimuth)));
@@ -395,8 +419,8 @@ WeaponType MissionManager::getWeaponType() const {
 }
 
 void setup() {
-    Serial.begin(Config::BAUD_RATE); // USB to W1
-    loraSerial.begin(Config::BAUD_RATE);
+    Serial.begin(Config::Display::BAUD_RATE); // USB to W1
+    loraSerial.begin(Config::Display::BAUD_RATE);
     Wire.begin();
     
     setupPins();
