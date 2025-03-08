@@ -1,7 +1,10 @@
+#pragma once
+
 #include <Adafruit_HMC5883_U.h>
 #include <Adafruit_BME280.h>
 #include <Arduino.h>
 #include <Wire.h>
+#include <array>
 
 // Configuration parameters
 namespace Config {
@@ -170,16 +173,15 @@ public:
 
     bool initializeSensors(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
         return retry([&]() {
-            if (mag.begin()) {
-                if (bme.begin(Config::Sensor::BME280_ADDRESS)) {
-                    return true;
-                } else {
-                    logger.log("BME280 initialization failed. Check the address and wiring.", Logger::LogLevel::ERROR);
-                }
-            } else {
+            if (!mag.begin()) {
                 logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::LogLevel::ERROR);
+                return false;
             }
-            return false;
+            if (!bme.begin(Config::Sensor::BME280_ADDRESS)) {
+                logger.log("BME280 initialization failed. Check the address and wiring.", Logger::LogLevel::ERROR);
+                return false;
+            }
+            return true;
         }, Config::System::SENSOR_RETRIES, Config::System::SENSOR_RETRY_DELAY_MS);
     }
 
@@ -256,8 +258,8 @@ public:
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
-        float readings[] = {speed, dir, pressure, temp, humidity};
-        if (isReadingValid(readings, Config::System::NUM_SENSOR_DATA)) {
+        std::array<float, Config::System::NUM_SENSOR_DATA> readings = {speed, dir, pressure, temp, humidity};
+        if (isReadingValid(readings)) {
             logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
             logger.log("Invalid sensor reading", Logger::LogLevel::WARNING);
@@ -280,9 +282,9 @@ private:
         return heading;
     }
 
-    bool isReadingValid(float* readings, int size) {
-        for (int i = 0; i < size; ++i) {
-            if (isnan(readings[i])) return false;
+    bool isReadingValid(const std::array<float, Config::System::NUM_SENSOR_DATA>& readings) {
+        for (const auto& reading : readings) {
+            if (isnan(reading)) return false;
         }
         return true;
     }

@@ -85,7 +85,7 @@ private:
     LogLevel currentLogLevel;
     Print& output;
 
-    const char* levelToString(LogLevel level) {
+    const char* levelToString(LogLevel level) const {
         switch (level) {
             case LogLevel::INFO: return "[INFO] ";
             case LogLevel::WARNING: return "[WARNING] ";
@@ -156,7 +156,7 @@ public:
     }
 
     static SoftwareSerial& getLoraSerial() {
-        static SoftwareSerial loraSerial(PIN(Constants::PinConfig::LORA_RX_PIN), PIN(Constants::PinConfig::LORA_TX_PIN));
+        static SoftwareSerial loraSerial(Constants::PinConfig::LORA_RX_PIN, Constants::PinConfig::LORA_TX_PIN);
         return loraSerial;
     }
 
@@ -172,8 +172,8 @@ public:
 };
 
 void setLEDState(bool redState, bool greenState) {
-    digitalWrite(PIN(Constants::PinConfig::RED_LED_PIN), redState ? HIGH : LOW);
-    digitalWrite(PIN(Constants::PinConfig::GREEN_LED_PIN), greenState ? HIGH : LOW);
+    digitalWrite(Constants::PinConfig::RED_LED_PIN, redState ? HIGH : LOW);
+    digitalWrite(Constants::PinConfig::GREEN_LED_PIN, greenState ? HIGH : LOW);
 }
 
 struct TargetData {
@@ -207,7 +207,7 @@ public:
     void updateEnvData(const std::vector<std::string_view>& tokens) {
         if (tokens.size() >= 5) {
             try {
-                float* dataPtr[] = { &data.wind_speed, &data.wind_dir, &data.pressure, &data.temp, &data.humidity };
+                std::array<float*, 5> dataPtr = { &data.wind_speed, &data.wind_dir, &data.pressure, &data.temp, &data.humidity };
                 for (size_t i = 0; i < 5; ++i) {
                     *dataPtr[i] = std::stof(std::string(tokens[i]));
                 }
@@ -237,19 +237,19 @@ public:
 };
 
 void setupPins() {
-    const std::array<Constants::PinConfig, 7> pins = {
-        Constants::PinConfig::UP_PIN,
-        Constants::PinConfig::DOWN_PIN,
-        Constants::PinConfig::SWITCH_81MM_PIN,
-        Constants::PinConfig::SWITCH_155MM_PIN,
-        Constants::PinConfig::SWITCH_120MM_PIN,
+    const std::array<int, 7> pins = {
+        Constants::PinConfig::LORA_RX_PIN,
+        Constants::PinConfig::LORA_TX_PIN,
+        Constants::PinConfig::RANGE_RX_PIN,
+        Constants::PinConfig::RANGE_TX_PIN,
+        Constants::PinConfig::TRIGGER_BUTTON_PIN,
         Constants::PinConfig::RED_LED_PIN,
         Constants::PinConfig::GREEN_LED_PIN
     };
 
-    std::for_each(pins.begin(), pins.end(), [](const Constants::PinConfig& pin) {
-        pinMode(PIN(pin), (pin == Constants::PinConfig::RED_LED_PIN || pin == Constants::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
-    });
+    for (const auto& pin : pins) {
+        pinMode(pin, (pin == Constants::PinConfig::RED_LED_PIN || pin == Constants::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
+    }
 
     setLEDState(true, false);
 }
@@ -322,13 +322,13 @@ void handleWeaponTypeChange() {
 }
 
 void handleDisplayNavigation() {
-    if (digitalRead(PIN(Constants::PinConfig::UP_PIN)) == LOW && Global::getMissionManager().displayStart > 0) {
+    if (digitalRead(Constants::PinConfig::UP_PIN) == LOW && Global::getMissionManager().displayStart > 0) {
         Global::getMissionManager().displayStart--;
         Global::getMissionManager().displayFireMissions();
         delay(Constants::Display::DEBOUNCE_DELAY);
         logger.log("Display navigated up", Logger::LogLevel::INFO);
     }
-    if (digitalRead(PIN(Constants::PinConfig::DOWN_PIN)) == LOW && Global::getMissionManager().displayStart + Constants::Display::DISPLAY_LINES < Global::getMissionManager().missions.size()) {
+    if (digitalRead(Constants::PinConfig::DOWN_PIN) == LOW && Global::getMissionManager().displayStart + Constants::Display::DISPLAY_LINES < Global::getMissionManager().missions.size()) {
         Global::getMissionManager().displayStart++;
         Global::getMissionManager().displayFireMissions();
         delay(Constants::Display::DEBOUNCE_DELAY);
@@ -446,11 +446,11 @@ void MissionManager::displayFireMissions() const {
 }
 
 WeaponType MissionManager::getWeaponType() const {
-    const std::pair<int, WeaponType> weaponPins[] = {
-        {PIN(Constants::PinConfig::SWITCH_81MM_PIN), WeaponType::MORTAR_81MM},
-        {PIN(Constants::PinConfig::SWITCH_155MM_PIN), WeaponType::ARTILLERY_155MM},
-        {PIN(Constants::PinConfig::SWITCH_120MM_PIN), WeaponType::TANK_120MM}
-    };
+    const std::array<std::pair<int, WeaponType>, 3> weaponPins = {{
+        {Constants::PinConfig::SWITCH_81MM_PIN, WeaponType::MORTAR_81MM},
+        {Constants::PinConfig::SWITCH_155MM_PIN, WeaponType::ARTILLERY_155MM},
+        {Constants::PinConfig::SWITCH_120MM_PIN, WeaponType::TANK_120MM}
+    }};
 
     for (const auto& [pin, weapon] : weaponPins) {
         if (digitalRead(pin) == LOW) {

@@ -88,7 +88,7 @@ private:
 
 class SensorSystem {
 public:
-    SensorSystem(Logger& logger) : logger(logger) {}
+    SensorSystem(Logger& logger) : logger(logger), sensorsOperational(true) {}
 
     void setup() {
         logger.begin(Constants::SerialConfig::SERIAL_BAUD_RATE);
@@ -116,7 +116,7 @@ private:
     SoftwareSerial rangeSerial{Constants::PinConfig::RANGE_RX_PIN, Constants::PinConfig::RANGE_TX_PIN};
     Adafruit_HMC5883_Unified mag{Constants::Device::DEVICE_ID};
     RTC_DS3231 rtc;
-    bool sensorsOperational{true};
+    bool sensorsOperational;
     unsigned long lastFlashTime{0};
     bool flashing{false};
     int flashPin;
@@ -125,7 +125,6 @@ private:
     Logger& logger;
 
     void initializeSystem() {
-        // Serial.begin(Constants::SerialConfig::SERIAL_BAUD_RATE); // Removed duplicate initialization
         initializeSerialPorts();
         Wire.begin();
         configurePins();
@@ -156,7 +155,7 @@ private:
     void onClick() {
         if (!sensorsOperational) return;
 
-        DateTime requestTime = rtc.now();
+        const auto requestTime = rtc.now();
         sendRequest(requestTime);
 
         if (waitForResponse()) {
@@ -177,7 +176,7 @@ private:
     }
 
     bool waitForResponse() {
-        unsigned long start = millis();
+        const auto start = millis();
         while (millis() - start < Constants::Timing::RESPONSE_TIMEOUT_MS) {
             if (loraSerial.available()) {
                 char response[Constants::Buffer::BUFFER_SIZE];
@@ -191,11 +190,11 @@ private:
     }
 
     bool processResponse(const char* response) {
-        float b1Time = atof(response + strlen(Constants::Messages::RESPONSE_PREFIX));
-        float dist_B1 = getDistanceFromB1(b1Time);
-        float bearing_B1 = getBearing();
-        float bearing_target = getBearing();
-        float dist_target = getDistanceToTarget();
+        const auto b1Time = atof(response + strlen(Constants::Messages::RESPONSE_PREFIX));
+        const auto dist_B1 = getDistanceFromB1(b1Time);
+        const auto bearing_B1 = getBearing();
+        const auto bearing_target = getBearing();
+        const auto dist_target = getDistanceToTarget();
 
         if (isnan(bearing_B1) || isnan(bearing_target) || isnan(dist_target)) {
             sensorsOperational = false;
@@ -232,7 +231,7 @@ private:
     }
 
     void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
-        DateTime now = rtc.now();
+        const auto now = rtc.now();
         char buffer[Constants::Buffer::DATA_BUFFER_SIZE];
         snprintf(buffer, sizeof(buffer), "%d,%ld,%.2f,%.2f,%.2f,%.2f", Constants::Device::DEVICE_ID, now.unixtime(),
                  dist_B1, bearing_B1, bearing_target, dist_target);
@@ -278,7 +277,7 @@ private:
     void handleFlashLED() {
         if (!flashing) return;
 
-        const unsigned long currentTime = millis();
+        const auto currentTime = millis();
         if (currentTime - lastFlashTime >= flashDuration) {
             digitalWrite(flashPin, LOW);
             flashing = false;
