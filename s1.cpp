@@ -27,6 +27,8 @@ namespace Constants {
     constexpr int LED_BLINK_INTERVAL_MS = 50;
     constexpr int BUFFER_SIZE = 64;
     constexpr int DATA_BUFFER_SIZE = 128;
+    constexpr char MAG_INIT_FAIL_MSG[] = "Magnetometer initialization failed!";
+    constexpr char RTC_INIT_FAIL_MSG[] = "RTC initialization failed!";
 }
 
 // Components
@@ -42,8 +44,7 @@ public:
 
     void setup() {
         Serial.begin(Constants::SERIAL_BAUD_RATE);
-        loraSerial.begin(Constants::SERIAL_BAUD_RATE);
-        rangeSerial.begin(Constants::SERIAL_BAUD_RATE);
+        initializeSerialPorts();
         Wire.begin();
 
         configurePins();
@@ -88,6 +89,10 @@ private:
         } else {
             startFlashLED(PinConfig::RED_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
+    }
+
+    static void onClickISR() {
+        sensorSystem.onClick();
     }
 
     void sendRequest(const DateTime& requestTime) {
@@ -163,6 +168,11 @@ private:
         digitalWrite(PinConfig::GREEN_LED_PIN, greenState);
     }
 
+    void initializeSerialPorts() {
+        loraSerial.begin(Constants::SERIAL_BAUD_RATE);
+        rangeSerial.begin(Constants::SERIAL_BAUD_RATE);
+    }
+
     void startFlashLED(int pin, int duration) {
         flashPin = pin;
         flashDuration = duration;
@@ -182,11 +192,11 @@ private:
 
     bool initializeSensors() {
         if (!mag.begin()) {
-            Serial.println("Magnetometer initialization failed!");
+            Serial.println(Constants::MAG_INIT_FAIL_MSG);
             return false;
         }
         if (!rtc.begin()) {
-            Serial.println("RTC initialization failed!");
+            Serial.println(Constants::RTC_INIT_FAIL_MSG);
             return false;
         }
         return true;
@@ -204,18 +214,14 @@ private:
         pinMode(PinConfig::RED_LED_PIN, OUTPUT);
         pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
     }
-
-    static void onClickISR() {
-        sensorSystem.onClick();
-    }
 };
 
-SensorSystem sensorSystem;
-
 void setup() {
+    static SensorSystem sensorSystem;
     sensorSystem.setup();
 }
 
 void loop() {
+    static SensorSystem sensorSystem;
     sensorSystem.loop();
 }

@@ -21,6 +21,7 @@ constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
 constexpr int NUM_SENSOR_DATA = 5;
 constexpr float PRESSURE_CONVERSION_FACTOR = 100.0;
+constexpr float WIND_SPEED_CONVERSION_FACTOR = 0.1;
 
 // Logger class
 class Logger {
@@ -63,6 +64,10 @@ public:
         digitalWrite(greenPin, state ? HIGH : LOW);
     }
 
+    bool getRedLEDState() const {
+        return digitalRead(redPin);
+    }
+
 private:
     int redPin;
     int greenPin;
@@ -71,12 +76,12 @@ private:
 // Sensor Manager class
 class SensorManager {
 public:
-    SensorManager()
+    SensorManager(LEDManager& ledManager, Logger& logger)
         : mag(Config::magSensorId), bme(), lastUpdateMillis(0), errorState(false),
-          ledManager(Config::sensorFailRedPin, Config::sensorOkGreenPin) {}
+          ledManager(ledManager), logger(logger) {}
 
     void setup() {
-        Logger::begin(Config::baudRate);
+        logger.begin(Config::baudRate);
         Wire.begin();
         ledManager.setup();
 
@@ -89,6 +94,9 @@ public:
 
     void loop() {
         unsigned long currentMillis = millis();
+        if (errorState) {
+            blinkRedLEDNonBlocking();
+        }
         if (shouldUpdate(currentMillis)) {
             lastUpdateMillis = currentMillis;
             updateSensorReadings();
@@ -100,15 +108,16 @@ private:
     Adafruit_BME280 bme;
     unsigned long lastUpdateMillis;
     bool errorState;
-    LEDManager ledManager;
+    LEDManager& ledManager;
+    Logger& logger;
 
     bool initializeSensors() {
         if (!mag.begin()) {
-            Logger::log("Magnetometer initialization failed");
+            logger.log("Magnetometer initialization failed");
             return false;
         }
         if (!bme.begin(Config::bme280Address)) {
-            Logger::log("BME280 initialization failed");
+            logger.log("BME280 initialization failed");
             return false;
         }
         return true;
@@ -116,14 +125,18 @@ private:
 
     void handleSensorError() {
         errorState = true;
-        Logger::log("Sensor failure");
+        logger.log("Sensor failure");
         ledManager.setRedLEDState(true);
-        // Non-blocking LED blink
-        unsigned long startMillis = millis();
-        while (millis() - startMillis < Config::blinkIntervalMs) {
+    }
+
+    void blinkRedLEDNonBlocking() {
+        static unsigned long lastBlinkMillis = 0;
+        unsigned long currentMillis = millis();
+
+        if (currentMillis - lastBlinkMillis >= Config::blinkIntervalMs) {
+            lastBlinkMillis = currentMillis;
             ledManager.setRedLEDState(!ledManager.getRedLEDState());
         }
-        ledManager.setRedLEDState(false);
     }
 
     void indicateSuccessfulStartup() {
@@ -139,8 +152,9 @@ private:
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
-        if (isReadingValid(speed, dir, pressure, temp, humidity)) {
-            Logger::logSensorData(speed, dir, pressure, temp, humidity);
+        float readings[] = {speed, dir, pressure, temp, humidity};
+        if (isReadingValid(readings, NUM_SENSOR_DATA)) {
+            logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
             ledManager.setRedLEDState(true);
         }
@@ -148,7 +162,7 @@ private:
 
     float getWindSpeed() {
         int raw = analogRead(Config::windSpeedPin);
-        return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * 0.1;
+        return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * WIND_SPEED_CONVERSION_FACTOR;
     }
 
     float getWindDirection() {
@@ -163,13 +177,18 @@ private:
         return (currentMillis - lastUpdateMillis) >= UPDATE_INTERVAL_MS;
     }
 
-    bool isReadingValid(float speed, float dir, float pressure, float temp, float humidity) {
-        return !isnan(speed) && !isnan(dir) && !isnan(pressure) && !isnan(temp) && !isnan(humidity);
+    bool isReadingValid(float* readings, int size) {
+        for (int i = 0; i < size; ++i) {
+            if (isnan(readings[i])) return false;
+        }
+        return true;
     }
 };
 
 // Configuration and setup
-SensorManager sensorManager;
+LEDManager ledManager(Config::sensorFailRedPin, Config::sensorOkGreenPin);
+Logger logger;
+SensorManager sensorManager(ledManager, logger);
 
 void setup() {
     sensorManager.setup();

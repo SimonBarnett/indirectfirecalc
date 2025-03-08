@@ -6,6 +6,7 @@
 #include <string>
 #include <sstream>
 #include <cmath>
+#include <optional>
 
 namespace Config {
     constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
@@ -136,8 +137,7 @@ struct FireMission {
 
 class EnvironmentalDataManager {
 public:
-    float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
-    bool envDataValid = false;
+    std::optional<float> wind_speed, wind_dir, pressure, temp, humidity;
 
     void updateEnvData(const std::vector<std::string>& tokens) {
         if (tokens.size() >= 5) {
@@ -146,8 +146,11 @@ public:
             pressure = std::stof(tokens[2]);
             temp = std::stof(tokens[3]);
             humidity = std::stof(tokens[4]);
-            envDataValid = true;
         }
+    }
+
+    bool isValid() const {
+        return wind_speed && wind_dir && pressure && temp && humidity;
     }
 };
 
@@ -177,7 +180,7 @@ void setupPins() {
     const int outputPins[] = {Config::RED_LED_PIN, Config::GREEN_LED_PIN};
 
     auto setPinMode = [](const int pins[], int mode) {
-        for (int pin : pins) {
+        for (auto pin : pins) {
             pinMode(pin, mode);
         }
     };
@@ -201,11 +204,11 @@ void readEnvData() {
         std::string envData = Serial.readStringUntil('\n').c_str();
         auto tokens = splitString(envData, ',');
         envManager.updateEnvData(tokens);
-        if (envManager.envDataValid) {
+        if (envManager.isValid()) {
             setLEDState(false, true);
             manager.recalculateAllMissions();
         }
-    } else if (!envManager.envDataValid) {
+    } else if (!envManager.isValid()) {
         setLEDState(true, false);
     }
 }
@@ -260,8 +263,12 @@ void handleDisplayNavigation() {
     }
 }
 
+float toRadians(float degrees) {
+    return degrees * Config::PI / 180;
+}
+
 void MissionManager::recalculateAllMissions() {
-    if (!envManager.envDataValid && missionCount == 0) return;
+    if (missionCount == 0) return;  // Simplified check
     WeaponType weapon = getWeaponType();
     for (int i = 0; i < missionCount; i++) {
         computeTarget(targets[i], missions[i], weapon);
@@ -271,22 +278,22 @@ void MissionManager::recalculateAllMissions() {
 }
 
 void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
-    float rad_B1 = target.bearing_B1 * Config::PI / 180;
+    float rad_B1 = toRadians(target.bearing_B1);
     float x_s = target.dist_B1 * sin(rad_B1);
     float y_s = target.dist_B1 * cos(rad_B1);
-    float rad_t = target.bearing_target * Config::PI / 180;
+    float rad_t = toRadians(target.bearing_target);
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
 
-    float temp_k = envManager.temp + 273.15;
-    float pv = (envManager.humidity / 100.0) * 6.1078 * pow(10, (7.5 * envManager.temp) / (237.3 + envManager.temp));
-    float pd = envManager.pressure - pv;
+    float temp_k = *envManager.temp + 273.15;
+    float pv = (*envManager.humidity / 100.0) * 6.1078 * pow(10, (7.5 * *envManager.temp) / (237.3 + *envManager.temp));
+    float pd = *envManager.pressure - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = envManager.wind_dir * Config::PI / 180;
-    float wind_x = envManager.wind_speed * cos(wind_rad);
-    float wind_y = envManager.wind_speed * sin(wind_rad);
+    float wind_rad = toRadians(*envManager.wind_dir);
+    float wind_x = *envManager.wind_speed * cos(wind_rad);
+    float wind_y = *envManager.wind_speed * sin(wind_rad);
 
     const WeaponProperties& properties = weaponProperties.at(weapon);
     x_t += wind_x * properties.tof;
