@@ -219,6 +219,10 @@ void readEnvData() {
 void readLoRaData() {
     if (loraSerial.available()) {
         std::string data = loraSerial.readStringUntil('\n').c_str();
+        if (data.find(',') == std::string::npos) {
+            Serial.println("Invalid LoRa data received");
+            return;
+        }
         if (data.find(',') == 1) {
             DateTime now = rtc.now();
             loraSerial.println("B1," + std::to_string(now.unixtime()));
@@ -280,6 +284,15 @@ void MissionManager::recalculateAllMissions() {
     displayFireMissions();
 }
 
+void computeWindAdjustedTarget(float& x_t, float& y_t, const TargetData& target, const WeaponProperties& properties) {
+    float wind_rad = toRadians(envManager.data.wind_dir);
+    float wind_x = envManager.data.wind_speed * cos(wind_rad);
+    float wind_y = envManager.data.wind_speed * sin(wind_rad);
+
+    x_t += wind_x * properties.tof;
+    y_t += wind_y * properties.tof;
+}
+
 void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
     float rad_B1 = toRadians(target.bearing_B1);
     float x_s = target.dist_B1 * sin(rad_B1);
@@ -294,13 +307,7 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = toRadians(envManager.data.wind_dir);
-    float wind_x = envManager.data.wind_speed * cos(wind_rad);
-    float wind_y = envManager.data.wind_speed * sin(wind_rad);
-
-    const WeaponProperties& properties = weaponProperties.at(weapon);
-    x_t += wind_x * properties.tof;
-    y_t += wind_y * properties.tof;
+    computeWindAdjustedTarget(x_t, y_t, target, weaponProperties.at(weapon));
 
     mission.range = sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
     mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * Config::PI));

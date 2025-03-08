@@ -32,11 +32,13 @@ public:
         ERROR
     };
 
-    static void begin(long baudRate) {
+    Logger() : currentLogLevel(INFO) {}
+
+    void begin(long baudRate) {
         Serial.begin(baudRate);
     }
 
-    static void log(const char* message, LogLevel level = INFO) {
+    void log(const char* message, LogLevel level = INFO) {
         if (level >= currentLogLevel) {
             switch (level) {
                 case INFO:
@@ -53,7 +55,7 @@ public:
         }
     }
 
-    static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
+    void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
         Serial.print("Speed: "); Serial.print(speed); Serial.print(", ");
         Serial.print("Direction: "); Serial.print(dir); Serial.print(", ");
         Serial.print("Pressure: "); Serial.print(pressure); Serial.print(", ");
@@ -61,16 +63,13 @@ public:
         Serial.print("Humidity: "); Serial.println(humidity);
     }
 
-    static void setLogLevel(LogLevel level) {
+    void setLogLevel(LogLevel level) {
         currentLogLevel = level;
     }
 
 private:
-    static LogLevel currentLogLevel;
+    LogLevel currentLogLevel;
 };
-
-// Define the static member variable
-Logger::LogLevel Logger::currentLogLevel = Logger::INFO;
 
 // LED Manager class
 class LEDManager {
@@ -101,45 +100,12 @@ private:
     int greenPin;
 };
 
-// Sensor Manager class
-class SensorManager {
+// Sensor Initializer class
+class SensorInitializer {
 public:
-    SensorManager(LEDManager& ledManager, Logger& logger)
-        : mag(Config::magSensorId), bme(), lastUpdateMillis(0), errorState(false),
-          ledManager(ledManager), logger(logger) {}
+    SensorInitializer(Logger& logger) : logger(logger) {}
 
-    void setup() {
-        logger.begin(Config::baudRate);
-        Wire.begin();
-        ledManager.setup();
-
-        if (!initializeSensors()) {
-            handleSensorError();
-        } else {
-            indicateSuccessfulStartup();
-        }
-    }
-
-    void loop() {
-        unsigned long currentMillis = millis();
-        if (errorState) {
-            blinkRedLEDNonBlocking();
-        }
-        if (shouldUpdate(currentMillis)) {
-            lastUpdateMillis = currentMillis;
-            updateSensorReadings();
-        }
-    }
-
-private:
-    Adafruit_HMC5883_Unified mag;
-    Adafruit_BME280 bme;
-    unsigned long lastUpdateMillis;
-    bool errorState;
-    LEDManager& ledManager;
-    Logger& logger;
-
-    bool initializeSensors() {
+    bool initializeSensors(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
         if (!mag.begin()) {
             logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
             return false;
@@ -151,7 +117,17 @@ private:
         return true;
     }
 
-    void handleSensorError() {
+private:
+    Logger& logger;
+};
+
+// Error Manager class
+class ErrorManager {
+public:
+    ErrorManager(LEDManager& ledManager, Logger& logger)
+        : ledManager(ledManager), logger(logger), errorState(false) {}
+
+    void handleError() {
         errorState = true;
         logger.log("Sensor failure", Logger::ERROR);
         ledManager.setRedLEDState(true);
@@ -167,15 +143,24 @@ private:
         }
     }
 
-    void indicateSuccessfulStartup() {
-        ledManager.setGreenLEDState(true);
-        delay(INIT_DELAY_MS);
-        ledManager.setGreenLEDState(false);
+    bool isErrorState() const {
+        return errorState;
     }
 
-    void updateSensorReadings() {
+private:
+    LEDManager& ledManager;
+    Logger& logger;
+    bool errorState;
+};
+
+// Sensor Reader class
+class SensorReader {
+public:
+    SensorReader(Logger& logger) : logger(logger) {}
+
+    void updateSensorReadings(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
         float speed = getWindSpeed();
-        float dir = getWindDirection();
+        float dir = getWindDirection(mag);
         float pressure = bme.readPressure() / PRESSURE_CONVERSION_FACTOR;
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
@@ -185,16 +170,18 @@ private:
             logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
             logger.log("Invalid sensor reading", Logger::WARNING);
-            ledManager.setRedLEDState(true);
         }
     }
+
+private:
+    Logger& logger;
 
     float getWindSpeed() {
         int raw = analogRead(Config::windSpeedPin);
         return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * WIND_SPEED_CONVERSION_FACTOR;
     }
 
-    float getWindDirection() {
+    float getWindDirection(Adafruit_HMC5883_Unified& mag) {
         sensors_event_t event;
         mag.getEvent(&event);
         float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
@@ -202,15 +189,63 @@ private:
         return heading;
     }
 
-    bool shouldUpdate(unsigned long currentMillis) {
-        return (currentMillis - lastUpdateMillis) >= UPDATE_INTERVAL_MS;
-    }
-
     bool isReadingValid(float* readings, int size) {
         for (int i = 0; i < size; ++i) {
             if (isnan(readings[i])) return false;
         }
         return true;
+    }
+};
+
+// Sensor Manager class
+class SensorManager {
+public:
+    SensorManager(LEDManager& ledManager, Logger& logger)
+        : mag(Config::magSensorId), bme(), lastUpdateMillis(0), errorState(false),
+          ledManager(ledManager), logger(logger), sensorInitializer(logger), errorManager(ledManager, logger), sensorReader(logger) {}
+
+    void setup() {
+        logger.begin(Config::baudRate);
+        Wire.begin();
+        ledManager.setup();
+
+        if (!sensorInitializer.initializeSensors(mag, bme)) {
+            errorManager.handleError();
+        } else {
+            indicateSuccessfulStartup();
+        }
+    }
+
+    void loop() {
+        unsigned long currentMillis = millis();
+        if (errorManager.isErrorState()) {
+            errorManager.blinkRedLEDNonBlocking();
+        }
+        if (shouldUpdate(currentMillis)) {
+            lastUpdateMillis = currentMillis;
+            sensorReader.updateSensorReadings(mag, bme);
+        }
+    }
+
+private:
+    Adafruit_HMC5883_Unified mag;
+    Adafruit_BME280 bme;
+    unsigned long lastUpdateMillis;
+    bool errorState;
+    LEDManager& ledManager;
+    Logger& logger;
+    SensorInitializer sensorInitializer;
+    ErrorManager errorManager;
+    SensorReader sensorReader;
+
+    void indicateSuccessfulStartup() {
+        ledManager.setGreenLEDState(true);
+        delay(INIT_DELAY_MS);
+        ledManager.setGreenLEDState(false);
+    }
+
+    bool shouldUpdate(unsigned long currentMillis) {
+        return (currentMillis - lastUpdateMillis) >= UPDATE_INTERVAL_MS;
     }
 };
 

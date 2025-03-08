@@ -54,11 +54,19 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { getInstance().onClickISR(); }, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { buttonPressed = true; }, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
     void loop() {
+        if (buttonPressed) {
+            buttonPressed = false;
+            delay(50); // Debounce delay
+            if (digitalRead(PinConfig::TRIGGER_BUTTON_PIN) == LOW) {
+                onClick();
+            }
+        }
+
         if (!sensorsOperational) {
             setLEDState(HIGH, LOW);
         }
@@ -66,23 +74,18 @@ public:
     }
 
 private:
-    SoftwareSerial loraSerial;
-    SoftwareSerial rangeSerial;
-    Adafruit_HMC5883_Unified mag;
+    SoftwareSerial loraSerial{PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN};
+    SoftwareSerial rangeSerial{PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN};
+    Adafruit_HMC5883_Unified mag{Constants::MAGNETOMETER_ID};
     RTC_DS3231 rtc;
-    bool sensorsOperational;
-    unsigned long lastFlashTime;
-    bool flashing;
+    bool sensorsOperational{true};
+    unsigned long lastFlashTime{0};
+    bool flashing{false};
     int flashPin;
     int flashDuration;
+    static volatile bool buttonPressed;
 
-    SensorSystem()
-        : loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN),
-          rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN),
-          mag(Constants::MAGNETOMETER_ID),
-          sensorsOperational(true),
-          lastFlashTime(0), 
-          flashing(false) {}
+    SensorSystem() = default;
 
     void onClick() {
         if (!sensorsOperational) return;
@@ -97,14 +100,14 @@ private:
         }
     }
 
-    void onClickISR() {
-        onClick();
+    void sendRequest(const DateTime& requestTime) {
+        sendDataToSerial(loraSerial, Constants::DEVICE_ID, requestTime.unixtime());
     }
 
-    void sendRequest(const DateTime& requestTime) {
+    void sendDataToSerial(SoftwareSerial& serial, int deviceId, long timestamp) {
         char buffer[Constants::BUFFER_SIZE];
-        snprintf(buffer, sizeof(buffer), "%d,%ld", Constants::DEVICE_ID, requestTime.unixtime());
-        loraSerial.println(buffer);
+        snprintf(buffer, sizeof(buffer), "%d,%ld", deviceId, timestamp);
+        serial.println(buffer);
     }
 
     bool waitForResponse() {
@@ -138,12 +141,12 @@ private:
         return true;
     }
 
-    float getDistanceFromB1(float b1Time) {
+    float getDistanceFromB1(float b1Time) const {
         const float currentTime = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
         return (currentTime - b1Time) * Constants::SPEED_OF_LIGHT;
     }
 
-    float getBearing() {
+    float getBearing() const {
         sensors_event_t event;
         mag.getEvent(&event);
         float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
@@ -211,8 +214,19 @@ private:
     void handleSensorFailure() {
         sensorsOperational = false;
         setLEDState(HIGH, LOW);
-        Serial.println("Sensor failure");
-        // Implement a proper reset or recovery mechanism
+        Serial.println("Sensor failure. Attempting to recover...");
+
+        // Implement a retry mechanism
+        for (int i = 0; i < 3; ++i) {
+            if (initializeSensors()) {
+                sensorsOperational = true;
+                Serial.println("Sensor recovery successful.");
+                return;
+            }
+            delay(1000); // Wait before retrying
+        }
+
+        Serial.println("Sensor recovery failed.");
     }
 
     void configurePins() {
@@ -221,6 +235,8 @@ private:
         pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
     }
 };
+
+volatile bool SensorSystem::buttonPressed = false;
 
 void setup() {
     SensorSystem::getInstance().setup();
