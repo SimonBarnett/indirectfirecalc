@@ -14,6 +14,7 @@ namespace Config {
   constexpr int SCREEN_WIDTH = 128;
   constexpr int SCREEN_HEIGHT = 64;
   constexpr int BAUD_RATE = 9600;
+  constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
 
   // Pin Definitions
   constexpr int UP_PIN = 3;
@@ -71,10 +72,14 @@ public:
     : display(screenWidth, screenHeight, twi, rst_pin) {}
 
   void setup() {
-    if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    if (!display.begin(SSD1306_SWITCHCAPVCC, Config::DISPLAY_I2C_ADDRESS)) {
       Serial.println("Display failure");
       delay(5000); // Wait 5 seconds before attempting a reset
     }
+    initializeDisplay();
+  }
+
+  void initializeDisplay() {
     display.clearDisplay();
     display.setTextSize(1);
     display.setTextColor(SSD1306_WHITE);

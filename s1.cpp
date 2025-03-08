@@ -5,23 +5,13 @@
 
 // Pin Definitions
 struct PinConfig {
-    int LORA_RX_PIN;
-    int LORA_TX_PIN;
-    int RANGE_RX_PIN;
-    int RANGE_TX_PIN;
-    int TRIGGER_BUTTON_PIN;
-    int RED_LED_PIN;
-    int GREEN_LED_PIN;
-};
-
-constexpr PinConfig pinConfig = {
-    .LORA_RX_PIN = 10,
-    .LORA_TX_PIN = 11,
-    .RANGE_RX_PIN = 3,
-    .RANGE_TX_PIN = 4,
-    .TRIGGER_BUTTON_PIN = 2,
-    .RED_LED_PIN = 8,
-    .GREEN_LED_PIN = 9
+    constexpr static int LORA_RX_PIN = 10;
+    constexpr static int LORA_TX_PIN = 11;
+    constexpr static int RANGE_RX_PIN = 3;
+    constexpr static int RANGE_TX_PIN = 4;
+    constexpr static int TRIGGER_BUTTON_PIN = 2;
+    constexpr static int RED_LED_PIN = 8;
+    constexpr static int GREEN_LED_PIN = 9;
 };
 
 // Constants
@@ -30,17 +20,19 @@ constexpr unsigned long RESPONSE_TIMEOUT = 500;
 constexpr float SPEED_OF_LIGHT = 3e8;
 constexpr float DEFAULT_DISTANCE = 3000.0;
 constexpr int SERIAL_BAUD_RATE = 9600;
+constexpr char RANGE_COMMAND[] = "RANGE";
+constexpr char RESPONSE_PREFIX[] = "B1";
 
 // Components
-SoftwareSerial loraSerial(pinConfig.LORA_RX_PIN, pinConfig.LORA_TX_PIN); 
-SoftwareSerial rangeSerial(pinConfig.RANGE_RX_PIN, pinConfig.RANGE_TX_PIN); 
+SoftwareSerial loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN); 
+SoftwareSerial rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN); 
 Adafruit_HMC5883_Unified mag(12345);
 RTC_DS3231 rtc;
 
 class SensorSystem {
 public:
-  SensorSystem(SoftwareSerial& lora, SoftwareSerial& range, Adafruit_HMC5883_Unified& magnetometer, RTC_DS3231& clock, const PinConfig& pins)
-    : loraSerial(lora), rangeSerial(range), mag(magnetometer), rtc(clock), pinConfig(pins), sensorsOperational(true) {}
+  SensorSystem(SoftwareSerial& lora, SoftwareSerial& range, Adafruit_HMC5883_Unified& magnetometer, RTC_DS3231& clock)
+    : loraSerial(lora), rangeSerial(range), mag(magnetometer), rtc(clock), sensorsOperational(true) {}
 
   void setup() {
     Serial.begin(SERIAL_BAUD_RATE);
@@ -48,18 +40,18 @@ public:
     rangeSerial.begin(SERIAL_BAUD_RATE);
     Wire.begin();
 
-    pinMode(pinConfig.TRIGGER_BUTTON_PIN, INPUT_PULLUP);
-    pinMode(pinConfig.RED_LED_PIN, OUTPUT);
-    pinMode(pinConfig.GREEN_LED_PIN, OUTPUT);
+    pinMode(PinConfig::TRIGGER_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(PinConfig::RED_LED_PIN, OUTPUT);
+    pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
     setLEDs(LOW, LOW);
 
     if (!initializeSensors()) {
       sensorFailure();
     } else {
-      flashLED(pinConfig.GREEN_LED_PIN, 500);
+      flashLED(PinConfig::GREEN_LED_PIN, 500);
     }
 
-    attachInterrupt(digitalPinToInterrupt(pinConfig.TRIGGER_BUTTON_PIN), onClick, FALLING);
+    attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), onClick, FALLING);
     rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
   }
 
@@ -74,7 +66,6 @@ private:
   SoftwareSerial& rangeSerial;
   Adafruit_HMC5883_Unified& mag;
   RTC_DS3231& rtc;
-  const PinConfig& pinConfig;
   bool sensorsOperational;
 
   static void onClick() {
@@ -88,7 +79,7 @@ private:
     while (millis() - start < RESPONSE_TIMEOUT) {
       if (loraSerial.available()) {
         String response = loraSerial.readStringUntil('\n');
-        if (response.startsWith("B1")) {
+        if (response.startsWith(RESPONSE_PREFIX)) {
           success = processResponse(response);
           break;
         }
@@ -96,14 +87,14 @@ private:
     }
 
     if (success) {
-      flashLED(pinConfig.GREEN_LED_PIN, 1000);
+      flashLED(PinConfig::GREEN_LED_PIN, 1000);
     } else {
-      flashLED(pinConfig.RED_LED_PIN, 1000);
+      flashLED(PinConfig::RED_LED_PIN, 1000);
     }
   }
 
   bool processResponse(const String& response) {
-    float b1Time = response.substring(3).toFloat();
+    float b1Time = response.substring(strlen(RESPONSE_PREFIX)).toFloat();
     float dist_B1 = getDistanceFromB1(b1Time);
     float bearing_B1 = getBearing();
     float bearing_target = getBearing();
@@ -133,7 +124,7 @@ private:
   }
 
   float getDistanceToTarget() {
-    rangeSerial.println("RANGE");
+    rangeSerial.println(RANGE_COMMAND);
     if (rangeSerial.available()) {
       return rangeSerial.readStringUntil('\n').toFloat();
     }
@@ -149,8 +140,8 @@ private:
   }
 
   void setLEDs(int redState, int greenState) {
-    digitalWrite(pinConfig.RED_LED_PIN, redState);
-    digitalWrite(pinConfig.GREEN_LED_PIN, greenState);
+    digitalWrite(PinConfig::RED_LED_PIN, redState);
+    digitalWrite(PinConfig::GREEN_LED_PIN, greenState);
   }
 
   void flashLED(int pin, int duration) {
@@ -171,11 +162,11 @@ private:
     sensorsOperational = false;
     setLEDs(HIGH, LOW);
     Serial.println("Sensor failure");
-    while (true);
+    while (true);  // Consider adding a reset mechanism instead of an infinite loop
   }
 };
 
-SensorSystem sensorSystem(loraSerial, rangeSerial, mag, rtc, pinConfig);
+SensorSystem sensorSystem(loraSerial, rangeSerial, mag, rtc);
 
 void setup() {
   sensorSystem.setup();
