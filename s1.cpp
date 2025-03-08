@@ -29,6 +29,7 @@ namespace Constants {
     constexpr int DATA_BUFFER_SIZE = 128;
     constexpr char MAG_INIT_FAIL_MSG[] = "Magnetometer initialization failed!";
     constexpr char RTC_INIT_FAIL_MSG[] = "RTC initialization failed!";
+    constexpr int MAGNETOMETER_ID = 12345;  // Replacing magic number
 }
 
 // Components
@@ -37,7 +38,7 @@ public:
     SensorSystem()
         : loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN),
           rangeSerial(PinConfig::RANGE_RX_PIN, PinConfig::RANGE_TX_PIN),
-          mag(12345),
+          mag(Constants::MAGNETOMETER_ID),
           sensorsOperational(true),
           lastFlashTime(0), 
           flashing(false) {}
@@ -56,7 +57,7 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), SensorSystem::onClickISR, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { instance->onClickISR(); }, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
@@ -78,6 +79,8 @@ private:
     int flashPin;
     int flashDuration;
 
+    static SensorSystem* instance;
+
     void onClick() {
         if (!sensorsOperational) return;
 
@@ -91,8 +94,8 @@ private:
         }
     }
 
-    static void onClickISR() {
-        sensorSystem.onClick();
+    void onClickISR() {
+        instance->onClick();
     }
 
     void sendRequest(const DateTime& requestTime) {
@@ -216,12 +219,14 @@ private:
     }
 };
 
+// SensorSystem instance managed locally in setup and loop
+SensorSystem* SensorSystem::instance = nullptr;
+
 void setup() {
-    static SensorSystem sensorSystem;
-    sensorSystem.setup();
+    SensorSystem::instance = new SensorSystem();
+    SensorSystem::instance->setup();
 }
 
 void loop() {
-    static SensorSystem sensorSystem;
-    sensorSystem.loop();
+    SensorSystem::instance->loop();
 }

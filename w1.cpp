@@ -26,21 +26,37 @@ constexpr float WIND_SPEED_CONVERSION_FACTOR = 0.1;
 // Logger class
 class Logger {
 public:
+    enum LogLevel {
+        INFO,
+        WARNING,
+        ERROR
+    };
+
     static void begin(long baudRate) {
         Serial.begin(baudRate);
     }
 
-    static void log(const char* message) {
+    static void log(const char* message, LogLevel level = INFO) {
+        switch (level) {
+            case INFO:
+                Serial.print("[INFO] ");
+                break;
+            case WARNING:
+                Serial.print("[WARNING] ");
+                break;
+            case ERROR:
+                Serial.print("[ERROR] ");
+                break;
+        }
         Serial.println(message);
     }
 
     static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
-        float sensorData[NUM_SENSOR_DATA] = {speed, dir, pressure, temp, humidity};
-        for (int i = 0; i < NUM_SENSOR_DATA; ++i) {
-            Serial.print(sensorData[i]);
-            if (i < NUM_SENSOR_DATA - 1) Serial.print(",");
-        }
-        Serial.println();
+        Serial.print("Speed: "); Serial.print(speed); Serial.print(", ");
+        Serial.print("Direction: "); Serial.print(dir); Serial.print(", ");
+        Serial.print("Pressure: "); Serial.print(pressure); Serial.print(", ");
+        Serial.print("Temperature: "); Serial.print(temp); Serial.print(", ");
+        Serial.print("Humidity: "); Serial.println(humidity);
     }
 };
 
@@ -113,11 +129,11 @@ private:
 
     bool initializeSensors() {
         if (!mag.begin()) {
-            logger.log("Magnetometer initialization failed");
+            logger.log("Magnetometer initialization failed", Logger::ERROR);
             return false;
         }
         if (!bme.begin(Config::bme280Address)) {
-            logger.log("BME280 initialization failed");
+            logger.log("BME280 initialization failed", Logger::ERROR);
             return false;
         }
         return true;
@@ -125,7 +141,7 @@ private:
 
     void handleSensorError() {
         errorState = true;
-        logger.log("Sensor failure");
+        logger.log("Sensor failure", Logger::ERROR);
         ledManager.setRedLEDState(true);
     }
 
@@ -156,6 +172,7 @@ private:
         if (isReadingValid(readings, NUM_SENSOR_DATA)) {
             logger.logSensorData(speed, dir, pressure, temp, humidity);
         } else {
+            logger.log("Invalid sensor reading", Logger::WARNING);
             ledManager.setRedLEDState(true);
         }
     }

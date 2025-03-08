@@ -22,7 +22,7 @@ namespace Config {
     constexpr float PI = 3.14159265358979323846;
     constexpr float GRAVITY = 9.81;
 
-    enum PinConfig {
+    enum class PinConfig {
         UP_PIN = 3,
         DOWN_PIN = 4,
         SWITCH_81MM_PIN = 5,
@@ -35,7 +35,7 @@ namespace Config {
     };
 }
 
-enum WeaponType {
+enum class WeaponType {
     MORTAR_81MM,
     ARTILLERY_155MM,
     TANK_120MM
@@ -48,9 +48,9 @@ struct WeaponProperties {
 };
 
 const std::map<WeaponType, WeaponProperties> weaponProperties = {
-    {MORTAR_81MM, {10.0, {70, 120, 170, 210, 250}, 5}},
-    {ARTILLERY_155MM, {20.0, {300, 450, 600, 750, 827}, 5}},
-    {TANK_120MM, {1.0, {1700}, 1}}
+    {WeaponType::MORTAR_81MM, {10.0, {70, 120, 170, 210, 250}, 5}},
+    {WeaponType::ARTILLERY_155MM, {20.0, {300, 450, 600, 750, 827}, 5}},
+    {WeaponType::TANK_120MM, {1.0, {1700}, 1}}
 };
 
 std::vector<std::string> splitString(const std::string &str, char delimiter) {
@@ -112,11 +112,11 @@ public:
 DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
 
 RTC_DS3231 rtc;
-SoftwareSerial loraSerial(Config::LORA_RX_PIN, Config::LORA_TX_PIN);
+SoftwareSerial loraSerial(static_cast<int>(Config::PinConfig::LORA_RX_PIN), static_cast<int>(Config::PinConfig::LORA_TX_PIN));
 
 void setLEDState(bool redState, bool greenState) {
-    digitalWrite(Config::RED_LED_PIN, redState ? HIGH : LOW);
-    digitalWrite(Config::GREEN_LED_PIN, greenState ? HIGH : LOW);
+    digitalWrite(static_cast<int>(Config::PinConfig::RED_LED_PIN), redState ? HIGH : LOW);
+    digitalWrite(static_cast<int>(Config::PinConfig::GREEN_LED_PIN), greenState ? HIGH : LOW);
 }
 
 struct TargetData {
@@ -162,7 +162,7 @@ public:
     std::array<FireMission, Config::MAX_MISSIONS> missions{};
     int missionCount = 0;
     int displayStart = 0;
-    WeaponType lastWeapon = MORTAR_81MM;
+    WeaponType lastWeapon = WeaponType::MORTAR_81MM;
 
     void recalculateAllMissions();
     void computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon);
@@ -174,10 +174,10 @@ MissionManager manager;
 
 void setupPins() {
     const int inputPins[] = {
-        Config::UP_PIN, Config::DOWN_PIN, 
-        Config::SWITCH_81MM_PIN, Config::SWITCH_155MM_PIN, Config::SWITCH_120MM_PIN
+        static_cast<int>(Config::PinConfig::UP_PIN), static_cast<int>(Config::PinConfig::DOWN_PIN), 
+        static_cast<int>(Config::PinConfig::SWITCH_81MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_155MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_120MM_PIN)
     };
-    const int outputPins[] = {Config::RED_LED_PIN, Config::GREEN_LED_PIN};
+    const int outputPins[] = {static_cast<int>(Config::PinConfig::RED_LED_PIN), static_cast<int>(Config::PinConfig::GREEN_LED_PIN)};
 
     auto setPinMode = [](const int pins[], int mode) {
         for (auto pin : pins) {
@@ -251,12 +251,12 @@ void handleWeaponTypeChange() {
 }
 
 void handleDisplayNavigation() {
-    if (digitalRead(Config::UP_PIN) == LOW && manager.displayStart > 0) {
+    if (digitalRead(static_cast<int>(Config::PinConfig::UP_PIN)) == LOW && manager.displayStart > 0) {
         manager.displayStart--;
         manager.displayFireMissions();
         delay(Config::DEBOUNCE_DELAY);
     }
-    if (digitalRead(Config::DOWN_PIN) == LOW && manager.displayStart + Config::DISPLAY_LINES < manager.missionCount) {
+    if (digitalRead(static_cast<int>(Config::PinConfig::DOWN_PIN)) == LOW && manager.displayStart + Config::DISPLAY_LINES < manager.missionCount) {
         manager.displayStart++;
         manager.displayFireMissions();
         delay(Config::DEBOUNCE_DELAY);
@@ -285,15 +285,15 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
 
-    float temp_k = *envManager.temp + 273.15;
-    float pv = (*envManager.humidity / 100.0) * 6.1078 * pow(10, (7.5 * *envManager.temp) / (237.3 + *envManager.temp));
-    float pd = *envManager.pressure - pv;
+    float temp_k = envManager.temp.value_or(20.0) + 273.15;
+    float pv = (envManager.humidity.value_or(50.0) / 100.0) * 6.1078 * pow(10, (7.5 * envManager.temp.value_or(20.0)) / (237.3 + envManager.temp.value_or(20.0)));
+    float pd = envManager.pressure.value_or(1013.25) - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = toRadians(*envManager.wind_dir);
-    float wind_x = *envManager.wind_speed * cos(wind_rad);
-    float wind_y = *envManager.wind_speed * sin(wind_rad);
+    float wind_rad = toRadians(envManager.wind_dir.value_or(0.0));
+    float wind_x = envManager.wind_speed.value_or(0.0) * cos(wind_rad);
+    float wind_y = envManager.wind_speed.value_or(0.0) * sin(wind_rad);
 
     const WeaponProperties& properties = weaponProperties.at(weapon);
     x_t += wind_x * properties.tof;
@@ -306,7 +306,7 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     mission.charge = 0;
     for (int i = 0; i < properties.maxCharges; i++) {
         float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::GRAVITY;
-        if (weapon == TANK_120MM) max_range = 5000;
+        if (weapon == WeaponType::TANK_120MM) max_range = 5000;
         if (mission.range <= max_range * 1.1) {
             mission.charge = i;
             break;
@@ -315,7 +315,7 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     }
     float v_chosen = properties.velocities[mission.charge];
 
-    if (weapon == TANK_120MM) {
+    if (weapon == WeaponType::TANK_120MM) {
         mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * Config::PI));
     } else {
         mission.elevation = 0.5 * asin((mission.range * Config::GRAVITY) / (v_chosen * v_chosen)) * (6400 / (2 * Config::PI));
@@ -326,7 +326,7 @@ void MissionManager::displayFireMissions() const {
     displayManager.clearDisplay();
     displayManager.setCursor(0, 0);
     WeaponType weapon = getWeaponType();
-    std::string weaponLabel = (weapon == MORTAR_81MM) ? "81mm Mortar" : (weapon == ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
+    std::string weaponLabel = (weapon == WeaponType::MORTAR_81MM) ? "81mm Mortar" : (weapon == WeaponType::ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
     displayManager.println("Weapon: " + weaponLabel);
     for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; i++) {
         displayManager.print("FM "); displayManager.print(std::to_string(missions[i].id));
@@ -340,9 +340,9 @@ void MissionManager::displayFireMissions() const {
 
 WeaponType MissionManager::getWeaponType() const {
     const std::pair<int, WeaponType> weaponPins[] = {
-        {Config::SWITCH_81MM_PIN, MORTAR_81MM},
-        {Config::SWITCH_155MM_PIN, ARTILLERY_155MM},
-        {Config::SWITCH_120MM_PIN, TANK_120MM}
+        {static_cast<int>(Config::PinConfig::SWITCH_81MM_PIN), WeaponType::MORTAR_81MM},
+        {static_cast<int>(Config::PinConfig::SWITCH_155MM_PIN), WeaponType::ARTILLERY_155MM},
+        {static_cast<int>(Config::PinConfig::SWITCH_120MM_PIN), WeaponType::TANK_120MM}
     };
 
     for (const auto& [pin, weapon] : weaponPins) {
@@ -350,7 +350,7 @@ WeaponType MissionManager::getWeaponType() const {
             return weapon;
         }
     }
-    return MORTAR_81MM; // Default
+    return WeaponType::MORTAR_81MM; // Default
 }
 
 void setup() {
