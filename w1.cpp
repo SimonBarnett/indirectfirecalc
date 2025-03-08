@@ -18,6 +18,7 @@ struct Config {
 // Constants
 constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
+constexpr int NUM_SENSOR_DATA = 5;
 
 // Logger class
 class Logger {
@@ -31,10 +32,10 @@ public:
     }
 
     static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
-        float sensorData[] = {speed, dir, pressure, temp, humidity};
-        for (int i = 0; i < 5; ++i) {
+        float sensorData[NUM_SENSOR_DATA] = {speed, dir, pressure, temp, humidity};
+        for (int i = 0; i < NUM_SENSOR_DATA; ++i) {
             Serial.print(sensorData[i]);
-            if (i < 4) Serial.print(",");
+            if (i < NUM_SENSOR_DATA - 1) Serial.print(",");
         }
         Serial.println();
     }
@@ -114,24 +115,13 @@ private:
 
     void handleSensorError() {
         errorState = true;
-        ledManager.setRedLEDState(true);
         Logger::log("Sensor failure");
-        unsigned long lastBlinkTime = millis();
-        while (errorState) {
-            unsigned long currentMillis = millis();
-            if (currentMillis - lastBlinkTime >= config.blinkIntervalMs) {
-                ledManager.setRedLEDState(!digitalRead(config.sensorFailRedPin));
-                lastBlinkTime = currentMillis;
-            }
-            delay(10); // Replace this with a non-blocking approach
-        }
+        blinkLED(config.sensorFailRedPin, config.blinkIntervalMs, INT_MAX);
     }
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        unsigned long startMillis = millis();
-        while (millis() - startMillis < INIT_DELAY_MS) {
-        }
+        blinkLED(config.sensorOkGreenPin, config.blinkIntervalMs, INIT_DELAY_MS);
         ledManager.setGreenLEDState(false);
     }
 
@@ -142,11 +132,10 @@ private:
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
-        bool isError = isnan(speed) || isnan(dir) || isnan(pressure) || isnan(temp) || isnan(humidity);
-        ledManager.setRedLEDState(isError);
-
-        if (!isError) {
+        if (isReadingValid(speed, dir, pressure, temp, humidity)) {
             Logger::logSensorData(speed, dir, pressure, temp, humidity);
+        } else {
+            ledManager.setRedLEDState(true);
         }
     }
 
@@ -166,17 +155,34 @@ private:
     bool shouldUpdate(unsigned long currentMillis) {
         return (currentMillis - lastUpdate) >= UPDATE_INTERVAL_MS;
     }
+
+    bool isReadingValid(float speed, float dir, float pressure, float temp, float humidity) {
+        return !isnan(speed) && !isnan(dir) && !isnan(pressure) && !isnan(temp) && !isnan(humidity);
+    }
+
+    void blinkLED(int pin, int intervalMs, int durationMs) {
+        unsigned long startMillis = millis();
+        bool ledState = false;
+        while (millis() - startMillis < durationMs) {
+            unsigned long currentMillis = millis();
+            if (currentMillis - startMillis >= intervalMs) {
+                ledState = !ledState;
+                digitalWrite(pin, ledState ? HIGH : LOW);
+                startMillis = currentMillis;
+            }
+        }
+    }
 };
 
 // Configuration and setup
-Config config;
-
-SensorManager sensorManager(config);
-
 void setup() {
+    Config config;
+    SensorManager sensorManager(config);
     sensorManager.setup();
 }
 
 void loop() {
+    static Config config;
+    static SensorManager sensorManager(config);
     sensorManager.loop();
 }

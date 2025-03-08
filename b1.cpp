@@ -149,13 +149,18 @@ public:
 MissionManager manager;
 
 void setupPins() {
-    pinMode(Config::UP_PIN, INPUT_PULLUP);
-    pinMode(Config::DOWN_PIN, INPUT_PULLUP);
-    pinMode(Config::SWITCH_81MM_PIN, INPUT_PULLUP);
-    pinMode(Config::SWITCH_155MM_PIN, INPUT_PULLUP);
-    pinMode(Config::SWITCH_120MM_PIN, INPUT_PULLUP);
-    pinMode(Config::RED_LED_PIN, OUTPUT);
-    pinMode(Config::GREEN_LED_PIN, OUTPUT);
+    const int inputPins[] = {
+        Config::UP_PIN, Config::DOWN_PIN, 
+        Config::SWITCH_81MM_PIN, Config::SWITCH_155MM_PIN, Config::SWITCH_120MM_PIN
+    };
+    const int outputPins[] = {Config::RED_LED_PIN, Config::GREEN_LED_PIN};
+
+    for (int pin : inputPins) {
+        pinMode(pin, INPUT_PULLUP);
+    }
+    for (int pin : outputPins) {
+        pinMode(pin, OUTPUT);
+    }
     setLEDState(true, false); // Red on until W1 connects
 }
 
@@ -205,11 +210,10 @@ void readLoRaData() {
                 target.dist_target = std::stof(tokens[5]);
 
                 if (manager.missionCount < Config::MAX_MISSIONS) {
-                    manager.targets[manager.missionCount] = target;
-                    manager.missionCount++;
+                    manager.targets[manager.missionCount++] = target;
                 } else {
-                    std::copy(manager.targets.begin() + 1, manager.targets.end(), manager.targets.begin());
-                    manager.targets[Config::MAX_MISSIONS - 1] = target;
+                    std::rotate(manager.targets.begin(), manager.targets.begin() + 1, manager.targets.end());
+                    manager.targets.back() = target;
                 }
                 manager.recalculateAllMissions();
             }
@@ -310,9 +314,17 @@ void MissionManager::displayFireMissions() {
 }
 
 WeaponType MissionManager::getWeaponType() {
-    if (digitalRead(Config::SWITCH_81MM_PIN) == LOW) return MORTAR_81MM;
-    if (digitalRead(Config::SWITCH_155MM_PIN) == LOW) return ARTILLERY_155MM;
-    if (digitalRead(Config::SWITCH_120MM_PIN) == LOW) return TANK_120MM;
+    const std::pair<int, WeaponType> weaponPins[] = {
+        {Config::SWITCH_81MM_PIN, MORTAR_81MM},
+        {Config::SWITCH_155MM_PIN, ARTILLERY_155MM},
+        {Config::SWITCH_120MM_PIN, TANK_120MM}
+    };
+
+    for (const auto& [pin, weapon] : weaponPins) {
+        if (digitalRead(pin) == LOW) {
+            return weapon;
+        }
+    }
     return MORTAR_81MM; // Default
 }
 

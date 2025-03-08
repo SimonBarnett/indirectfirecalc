@@ -36,7 +36,7 @@ RTC_DS3231 rtc;
 class SensorSystem {
 public:
     SensorSystem(SoftwareSerial& lora, SoftwareSerial& range, Adafruit_HMC5883_Unified& magnetometer, RTC_DS3231& clock)
-        : loraSerial(lora), rangeSerial(range), mag(magnetometer), rtc(clock), sensorsOperational(true) {}
+        : loraSerial(lora), rangeSerial(range), mag(magnetometer), rtc(clock), sensorsOperational(true), lastFlashTime(0), flashing(false) {}
 
     void setup() {
         Serial.begin(SERIAL_BAUD_RATE);
@@ -50,7 +50,7 @@ public:
         if (!initializeSensors()) {
             handleSensorFailure();
         } else {
-            flashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
+            startFlashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
         }
 
         attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), onClick, FALLING);
@@ -61,6 +61,7 @@ public:
         if (!sensorsOperational) {
             setLEDs(HIGH, LOW);
         }
+        handleFlashLED();
     }
 
 private:
@@ -69,6 +70,10 @@ private:
     Adafruit_HMC5883_Unified& mag;
     RTC_DS3231& rtc;
     bool sensorsOperational;
+    unsigned long lastFlashTime;
+    bool flashing;
+    int flashPin;
+    int flashDuration;
 
     static SensorSystem* instance;
 
@@ -79,9 +84,9 @@ private:
         instance->sendRequest(requestTime);
 
         if (instance->waitForResponse()) {
-            instance->flashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
+            instance->startFlashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
         } else {
-            instance->flashLED(PinConfig::RED_LED_PIN, LED_FLASH_DURATION_MS);
+            instance->startFlashLED(PinConfig::RED_LED_PIN, LED_FLASH_DURATION_MS);
         }
     }
 
@@ -155,13 +160,24 @@ private:
         digitalWrite(PinConfig::GREEN_LED_PIN, greenState);
     }
 
-    void flashLED(int pin, int duration) {
-        unsigned long startTime = millis();
-        while (millis() - startTime < duration) {
-            digitalWrite(pin, HIGH);
-            delay(LED_BLINK_INTERVAL_MS);
-            digitalWrite(pin, LOW);
-            delay(LED_BLINK_INTERVAL_MS);
+    void startFlashLED(int pin, int duration) {
+        flashPin = pin;
+        flashDuration = duration;
+        lastFlashTime = millis();
+        flashing = true;
+    }
+
+    void handleFlashLED() {
+        if (flashing) {
+            unsigned long currentTime = millis();
+            if (currentTime - lastFlashTime >= flashDuration) {
+                digitalWrite(flashPin, LOW);
+                flashing = false;
+            } else if ((currentTime / LED_BLINK_INTERVAL_MS) % 2 == 0) {
+                digitalWrite(flashPin, HIGH);
+            } else {
+                digitalWrite(flashPin, LOW);
+            }
         }
     }
 
