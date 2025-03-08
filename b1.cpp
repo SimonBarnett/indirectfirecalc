@@ -3,24 +3,49 @@
 #include <RTC_DS3231.h>
 #include <SoftwareSerial.h>
 #include <cmath>
+#include <vector>
 
-#define PIN(pin) static_cast<int>(pin)
-
-namespace Config {
-    constexpr int MILS_PER_CIRCLE = 6400;
-
-    namespace Physics {
-        constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
-        constexpr float PI = 3.14159265358979323846;
-        constexpr float GRAVITY = 9.81;
-        constexpr float TEMPERATURE_CONVERSION = 273.15;
-        constexpr float PRESSURE_CONSTANT_DRY_AIR = 287;
-        constexpr float PRESSURE_CONSTANT_VAPOR = 461.5;
-        constexpr float STANDARD_DENSITY = 1.225;
-        constexpr float TO_RADIANS = PI / 180;
-        constexpr float TO_MILS = MILS_PER_CIRCLE / (2 * PI);
+// Constants for configuration
+namespace Constants {
+    namespace SerialConfig {
+        constexpr int SERIAL_BAUD_RATE = 9600;
     }
-
+    namespace Timing {
+        constexpr int LED_FLASH_DURATION_MS = 500;
+        constexpr int DEBOUNCE_DELAY_MS = 50;
+        constexpr int RESPONSE_TIMEOUT_MS = 5000;
+        constexpr int RETRY_ATTEMPTS = 3;
+        constexpr int SENSOR_RECOVERY_DELAY_MS = 1000;
+        constexpr int LED_BLINK_INTERVAL_MS = 1000;
+    }
+    namespace Speed {
+        constexpr float SPEED_OF_LIGHT = 299792458.0;
+    }
+    namespace Buffer {
+        constexpr int BUFFER_SIZE = 64;
+        constexpr int DATA_BUFFER_SIZE = 128;
+    }
+    namespace Messages {
+        constexpr char MAG_INIT_FAIL_MSG[] = "Magnetometer initialization failed.";
+        constexpr char RTC_INIT_FAIL_MSG[] = "RTC initialization failed.";
+        constexpr char RESPONSE_PREFIX[] = "RESP:";
+        constexpr char RANGE_COMMAND[] = "RANGE";
+    }
+    namespace DefaultValues {
+        constexpr float DEFAULT_DISTANCE = -1.0;
+    }
+    namespace Device {
+        constexpr int DEVICE_ID = 1;
+    }
+    namespace PinConfig {
+        constexpr int LORA_RX_PIN = 10;
+        constexpr int LORA_TX_PIN = 11;
+        constexpr int RANGE_RX_PIN = 12;
+        constexpr int RANGE_TX_PIN = 13;
+        constexpr int TRIGGER_BUTTON_PIN = 2;
+        constexpr int RED_LED_PIN = 3;
+        constexpr int GREEN_LED_PIN = 4;
+    }
     namespace Display {
         constexpr int SCREEN_WIDTH = 128;
         constexpr int SCREEN_HEIGHT = 64;
@@ -30,56 +55,49 @@ namespace Config {
         constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
         constexpr int DISPLAY_LINES = 4;
     }
+}
 
-    constexpr int MAX_MISSIONS = 10;
-
-    enum class PinConfig {
-        UP_PIN = 3,
-        DOWN_PIN = 4,
-        SWITCH_81MM_PIN = 5,
-        SWITCH_155MM_PIN = 6,
-        SWITCH_120MM_PIN = 7,
-        RED_LED_PIN = 8,
-        GREEN_LED_PIN = 9,
-        LORA_RX_PIN = 10,
-        LORA_TX_PIN = 11
+// Logger class
+class Logger {
+public:
+    enum class LogLevel {
+        INFO,
+        WARNING,
+        ERROR
     };
-}
 
-enum class WeaponType {
-    MORTAR_81MM,
-    ARTILLERY_155MM,
-    TANK_120MM
-};
+    Logger(Print& output) : currentLogLevel(LogLevel::INFO), output(output) {}
 
-struct WeaponProperties {
-    float tof;
-    std::array<float, 5> velocities;
-    int maxCharges;
-};
-
-constexpr WeaponProperties weaponProperties[] = {
-    {10.0, {70, 120, 170, 210, 250}, 5},
-    {20.0, {300, 450, 600, 750, 827}, 5},
-    {1.0, {1700}, 1}
-};
-
-constexpr WeaponProperties getWeaponProperties(WeaponType weapon) {
-    return weaponProperties[static_cast<int>(weapon)];
-}
-
-std::vector<std::string_view> splitString(std::string_view str, char delimiter) {
-    std::vector<std::string_view> tokens;
-    size_t start = 0;
-    size_t end = str.find(delimiter);
-    while (end != std::string::npos) {
-        tokens.emplace_back(str.substr(start, end - start));
-        start = end + 1;
-        end = str.find(delimiter, start);
+    void begin(long baudRate) {
+        Serial.begin(baudRate);
     }
-    tokens.emplace_back(str.substr(start));
-    return tokens;
-}
+
+    void log(const char* message, LogLevel level = LogLevel::INFO) {
+        if (level >= currentLogLevel) {
+            output.print(levelToString(level));
+            output.println(message);
+        }
+    }
+
+    void setLogLevel(LogLevel level) {
+        currentLogLevel = level;
+    }
+
+private:
+    LogLevel currentLogLevel;
+    Print& output;
+
+    const char* levelToString(LogLevel level) {
+        switch (level) {
+            case LogLevel::INFO: return "[INFO] ";
+            case LogLevel::WARNING: return "[WARNING] ";
+            case LogLevel::ERROR: return "[ERROR] ";
+            default: return "";
+        }
+    }
+};
+
+Logger logger(Serial);
 
 class DisplayManager {
 private:
@@ -89,9 +107,9 @@ public:
         : display(screenWidth, screenHeight, &twi, rst_pin) {}
 
     void setup() {
-        if (!display.begin(SSD1306_SWITCHCAPVCC, Config::Display::DISPLAY_I2C_ADDRESS)) {
-            Serial.println("Display failure");
-            delay(Config::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+        if (!display.begin(SSD1306_SWITCHCAPVCC, Constants::Display::DISPLAY_I2C_ADDRESS)) {
+            logger.log("Display failure", Logger::LogLevel::ERROR);
+            delay(Constants::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
         } else {
             initializeDisplay();
         }
@@ -127,17 +145,37 @@ public:
     }
 };
 
-namespace Global {
-    DisplayManager displayManager(Config::Display::SCREEN_WIDTH, Config::Display::SCREEN_HEIGHT, Wire, -1);
-    RTC_DS3231 rtc;
-    SoftwareSerial loraSerial(PIN(Config::PinConfig::LORA_RX_PIN), PIN(Config::PinConfig::LORA_TX_PIN));
-    EnvironmentalDataManager envManager;
-    MissionManager manager;
-}
+class Global {
+public:
+    static DisplayManager& getDisplayManager() {
+        static DisplayManager displayManager(Constants::Display::SCREEN_WIDTH, Constants::Display::SCREEN_HEIGHT, Wire, -1);
+        return displayManager;
+    }
+
+    static RTC_DS3231& getRTC() {
+        static RTC_DS3231 rtc;
+        return rtc;
+    }
+
+    static SoftwareSerial& getLoraSerial() {
+        static SoftwareSerial loraSerial(PIN(Constants::PinConfig::LORA_RX_PIN), PIN(Constants::PinConfig::LORA_TX_PIN));
+        return loraSerial;
+    }
+
+    static EnvironmentalDataManager& getEnvManager() {
+        static EnvironmentalDataManager envManager;
+        return envManager;
+    }
+
+    static MissionManager& getMissionManager() {
+        static MissionManager manager;
+        return manager;
+    }
+};
 
 void setLEDState(bool redState, bool greenState) {
-    digitalWrite(PIN(Config::PinConfig::RED_LED_PIN), redState ? HIGH : LOW);
-    digitalWrite(PIN(Config::PinConfig::GREEN_LED_PIN), greenState ? HIGH : LOW);
+    digitalWrite(PIN(Constants::PinConfig::RED_LED_PIN), redState ? HIGH : LOW);
+    digitalWrite(PIN(Constants::PinConfig::GREEN_LED_PIN), greenState ? HIGH : LOW);
 }
 
 struct TargetData {
@@ -175,8 +213,9 @@ public:
                 for (size_t i = 0; i < 5; ++i) {
                     *dataPtr[i] = std::stof(std::string(tokens[i]));
                 }
+                logger.log("Environmental data updated", Logger::LogLevel::INFO);
             } catch (const std::invalid_argument& e) {
-                Serial.println("Invalid environmental data format");
+                logger.log("Invalid environmental data format", Logger::LogLevel::ERROR);
             }
         }
     }
@@ -188,9 +227,8 @@ public:
 
 class MissionManager {
 public:
-    std::array<TargetData, Config::MAX_MISSIONS> targets{};
-    std::array<FireMission, Config::MAX_MISSIONS> missions{};
-    int missionCount = 0;
+    std::vector<TargetData> targets;
+    std::vector<FireMission> missions;
     int displayStart = 0;
     WeaponType lastWeapon = WeaponType::MORTAR_81MM;
 
@@ -201,36 +239,37 @@ public:
 };
 
 void setupPins() {
-    const std::array<Config::PinConfig, 7> pins = {
-        Config::PinConfig::UP_PIN,
-        Config::PinConfig::DOWN_PIN,
-        Config::PinConfig::SWITCH_81MM_PIN,
-        Config::PinConfig::SWITCH_155MM_PIN,
-        Config::PinConfig::SWITCH_120MM_PIN,
-        Config::PinConfig::RED_LED_PIN,
-        Config::PinConfig::GREEN_LED_PIN
+    const std::array<Constants::PinConfig, 7> pins = {
+        Constants::PinConfig::UP_PIN,
+        Constants::PinConfig::DOWN_PIN,
+        Constants::PinConfig::SWITCH_81MM_PIN,
+        Constants::PinConfig::SWITCH_155MM_PIN,
+        Constants::PinConfig::SWITCH_120MM_PIN,
+        Constants::PinConfig::RED_LED_PIN,
+        Constants::PinConfig::GREEN_LED_PIN
     };
 
-    std::for_each(pins.begin(), pins.end(), [](const Config::PinConfig& pin) {
-        pinMode(PIN(pin), (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
+    std::for_each(pins.begin(), pins.end(), [](const Constants::PinConfig& pin) {
+        pinMode(PIN(pin), (pin == Constants::PinConfig::RED_LED_PIN || pin == Constants::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
     });
 
     setLEDState(true, false); // Red on until W1 connects
 }
 
 void setupRTC() {
-    if (!Global::rtc.begin()) {
-        Serial.println("RTC failure");
-        delay(Config::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+    if (!Global::getRTC().begin()) {
+        logger.log("RTC failure", Logger::LogLevel::ERROR);
+        delay(Constants::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
     } else {
-        Global::rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+        Global::getRTC().adjust(DateTime(F(__DATE__), F(__TIME__)));
+        logger.log("RTC initialized", Logger::LogLevel::INFO);
     }
 }
 
 void updateLEDAndRecalculate(EnvironmentalDataManager &envManager) {
     if (envManager.isValid()) {
         setLEDState(false, true);
-        Global::manager.recalculateAllMissions();
+        Global::getMissionManager().recalculateAllMissions();
     } else {
         setLEDState(true, false);
     }
@@ -244,7 +283,7 @@ void readEnvData(EnvironmentalDataManager &envManager) {
             envManager.updateEnvData(tokens);
             updateLEDAndRecalculate(envManager);
         } else {
-            Serial.println("Invalid environmental data received");
+            logger.log("Invalid environmental data received", Logger::LogLevel::ERROR);
             setLEDState(true, false);
         }
     } else if (!envManager.isValid()) {
@@ -253,11 +292,11 @@ void readEnvData(EnvironmentalDataManager &envManager) {
 }
 
 void readLoRaData() {
-    if (Global::loraSerial.available()) {
-        String data = Global::loraSerial.readStringUntil('\n');
+    if (Global::getLoraSerial().available()) {
+        String data = Global::getLoraSerial().readStringUntil('\n');
         auto tokens = splitString(data.c_str(), ',');
         if (tokens.size() < 6) {
-            Serial.println("Invalid LoRa data received: " + data);
+            logger.log("Invalid LoRa data received: " + data, Logger::LogLevel::ERROR);
             return;
         }
         // Extract target data and process...
@@ -270,51 +309,58 @@ void readLoRaData() {
             target.bearing_target = std::stof(std::string(tokens[3]));
             target.dist_target = std::stof(std::string(tokens[4]));
             // Process target data...
-            updateLEDAndRecalculate(Global::envManager);
+            updateLEDAndRecalculate(Global::getEnvManager());
+            logger.log("LoRa data processed", Logger::LogLevel::INFO);
         } catch (const std::invalid_argument& e) {
-            Serial.println("Invalid target data format: " + data);
+            logger.log("Invalid target data format: " + data, Logger::LogLevel::ERROR);
         }
     }
 }
 
 void handleWeaponTypeChange() {
-    WeaponType currentWeapon = Global::manager.getWeaponType();
-    if (currentWeapon != Global::manager.lastWeapon) {
-        Global::manager.lastWeapon = currentWeapon;
-        Global::manager.recalculateAllMissions();
+    WeaponType currentWeapon = Global::getMissionManager().getWeaponType();
+    if (currentWeapon != Global::getMissionManager().lastWeapon) {
+        Global::getMissionManager().lastWeapon = currentWeapon;
+        Global::getMissionManager().recalculateAllMissions();
+        logger.log("Weapon type changed", Logger::LogLevel::INFO);
     }
 }
 
 void handleDisplayNavigation() {
-    if (digitalRead(PIN(Config::PinConfig::UP_PIN)) == LOW && Global::manager.displayStart > 0) {
-        Global::manager.displayStart--;
-        Global::manager.displayFireMissions();
-        delay(Config::Display::DEBOUNCE_DELAY);
+    if (digitalRead(PIN(Constants::PinConfig::UP_PIN)) == LOW && Global::getMissionManager().displayStart > 0) {
+        Global::getMissionManager().displayStart--;
+        Global::getMissionManager().displayFireMissions();
+        delay(Constants::Display::DEBOUNCE_DELAY);
+        logger.log("Display navigated up", Logger::LogLevel::INFO);
     }
-    if (digitalRead(PIN(Config::PinConfig::DOWN_PIN)) == LOW && Global::manager.displayStart + Config::Display::DISPLAY_LINES < Global::manager.missionCount) {
-        Global::manager.displayStart++;
-        Global::manager.displayFireMissions();
-        delay(Config::Display::DEBOUNCE_DELAY);
+    if (digitalRead(PIN(Constants::PinConfig::DOWN_PIN)) == LOW && Global::getMissionManager().displayStart + Constants::Display::DISPLAY_LINES < Global::getMissionManager().missions.size()) {
+        Global::getMissionManager().displayStart++;
+        Global::getMissionManager().displayFireMissions();
+        delay(Constants::Display::DEBOUNCE_DELAY);
+        logger.log("Display navigated down", Logger::LogLevel::INFO);
     }
 }
 
 float toRadians(float degrees) {
-    return degrees * Config::Physics::TO_RADIANS;
+    return degrees * Constants::Physics::TO_RADIANS;
 }
 
 void MissionManager::recalculateAllMissions() {
     WeaponType weapon = getWeaponType();
-    for (int i = 0; i < missionCount; ++i) {
-        computeTarget(targets[i], missions[i], weapon);
-        missions[i].id = targets[i].id;
+    for (auto& target : targets) {
+        FireMission mission;
+        computeTarget(target, mission, weapon);
+        mission.id = target.id;
+        missions.push_back(mission);
     }
     displayFireMissions();
+    logger.log("All missions recalculated", Logger::LogLevel::INFO);
 }
 
 void computeWindAdjustedTarget(float& x_t, float& y_t, const TargetData& target, const WeaponProperties& properties) {
-    float wind_rad = toRadians(Global::envManager.data.wind_dir);
-    float wind_x = Global::envManager.data.wind_speed * cos(wind_rad);
-    float wind_y = Global::envManager.data.wind_speed * sin(wind_rad);
+    float wind_rad = toRadians(Global::getEnvManager().data.wind_dir);
+    float wind_x = Global::getEnvManager().data.wind_speed * cos(wind_rad);
+    float wind_y = Global::getEnvManager().data.wind_speed * sin(wind_rad);
 
     x_t += wind_x * properties.tof;
     y_t += wind_y * properties.tof;
@@ -336,11 +382,11 @@ Coordinates calculateTargetCoordinates(const TargetData& target) {
 }
 
 float calculateDensityFactor() {
-    float temp_k = Global::envManager.data.temp + Config::Physics::TEMPERATURE_CONVERSION;
-    float pv = (Global::envManager.data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * Global::envManager.data.temp) / (237.3 + Global::envManager.data.temp));
-    float pd = Global::envManager.data.pressure - pv;
-    float density = (pd * 100 / (Config::Physics::PRESSURE_CONSTANT_DRY_AIR * temp_k)) + (pv * 100 / (Config::Physics::PRESSURE_CONSTANT_VAPOR * temp_k));
-    return Config::Physics::STANDARD_DENSITY / density;
+    float temp_k = Global::getEnvManager().data.temp + Constants::Physics::TEMPERATURE_CONVERSION;
+    float pv = (Global::getEnvManager().data.humidity / 100.0) * 6.1078 * pow(10, (7.5 * Global::getEnvManager().data.temp) / (237.3 + Global::getEnvManager().data.temp));
+    float pd = Global::getEnvManager().data.pressure - pv;
+    float density = (pd * 100 / (Constants::Physics::PRESSURE_CONSTANT_DRY_AIR * temp_k)) + (pv * 100 / (Constants::Physics::PRESSURE_CONSTANT_VAPOR * temp_k));
+    return Constants::Physics::STANDARD_DENSITY / density;
 }
 
 float calculateRange(float x_t, float y_t, float density_factor) {
@@ -348,15 +394,15 @@ float calculateRange(float x_t, float y_t, float density_factor) {
 }
 
 float calculateAzimuth(float x_t, float y_t) {
-    float azimuth = atan2(x_t, y_t) * Config::Physics::TO_MILS;
-    if (azimuth < 0) azimuth += Config::MILS_PER_CIRCLE;
+    float azimuth = atan2(x_t, y_t) * Constants::Physics::TO_MILS;
+    if (azimuth < 0) azimuth += Constants::MILS_PER_CIRCLE;
     return azimuth;
 }
 
 int determineCharge(float range, WeaponType weapon) {
     const auto& properties = getWeaponProperties(weapon);
     for (int i = 0; i < properties.maxCharges; ++i) {
-        float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::Physics::GRAVITY;
+        float max_range = (properties.velocities[i] * properties.velocities[i]) / Constants::Physics::GRAVITY;
         if (weapon == WeaponType::TANK_120MM) max_range = 5000;
         if (range <= max_range * 1.1) {
             return i;
@@ -369,9 +415,9 @@ float calculateElevation(float range, WeaponType weapon, int charge) {
     const auto& properties = getWeaponProperties(weapon);
     float v_chosen = properties.velocities[charge];
     if (weapon == WeaponType::TANK_120MM) {
-        return atan2(range, target.dist_target) * Config::Physics::TO_MILS;
+        return atan2(range, target.dist_target) * Constants::Physics::TO_MILS;
     } else {
-        return 0.5 * asin((range * Config::Physics::GRAVITY) / (v_chosen * v_chosen)) * Config::Physics::TO_MILS;
+        return 0.5 * asin((range * Constants::Physics::GRAVITY) / (v_chosen * v_chosen)) * Constants::Physics::TO_MILS;
     }
 }
 
@@ -383,29 +429,32 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     mission.azimuth = calculateAzimuth(coordinates.x, coordinates.y);
     mission.charge = determineCharge(mission.range, weapon);
     mission.elevation = calculateElevation(mission.range, weapon, mission.charge);
+    logger.log("Target computed", Logger::LogLevel::INFO);
 }
 
 void MissionManager::displayFireMissions() const {
-    Global::displayManager.clearDisplay();
-    Global::displayManager.setCursor(0, 0);
+    auto& displayManager = Global::getDisplayManager();
+    displayManager.clearDisplay();
+    displayManager.setCursor(0, 0);
     WeaponType weapon = getWeaponType();
     std::string weaponLabel = (weapon == WeaponType::MORTAR_81MM) ? "81mm Mortar" : (weapon == WeaponType::ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
-    Global::displayManager.println("Weapon: " + weaponLabel);
-    for (int i = displayStart; i < missionCount && i < displayStart + Config::Display::DISPLAY_LINES; ++i) {
-        Global::displayManager.print("FM "); Global::displayManager.print(std::to_string(missions[i].id));
-        Global::displayManager.print(": Chg "); Global::displayManager.print(std::to_string(missions[i].charge));
-        Global::displayManager.print(", Azi "); Global::displayManager.print(std::to_string(static_cast<int>(missions[i].azimuth)));
-        Global::displayManager.print(", Rng "); Global::displayManager.print(std::to_string(static_cast<int>(missions[i].range)));
-        Global::displayManager.print(", Ele "); Global::displayManager.println(std::to_string(static_cast<int>(missions[i].elevation)));
+    displayManager.println("Weapon: " + weaponLabel);
+    for (int i = displayStart; i < missions.size() && i < displayStart + Constants::Display::DISPLAY_LINES; ++i) {
+        displayManager.print("FM "); displayManager.print(std::to_string(missions[i].id));
+        displayManager.print(": Chg "); displayManager.print(std::to_string(missions[i].charge));
+        displayManager.print(", Azi "); displayManager.print(std::to_string(static_cast<int>(missions[i].azimuth)));
+        displayManager.print(", Rng "); displayManager.print(std::to_string(static_cast<int>(missions[i].range)));
+        displayManager.print(", Ele "); displayManager.println(std::to_string(static_cast<int>(missions[i].elevation)));
     }
-    Global::displayManager.displayContent();
+    displayManager.displayContent();
+    logger.log("Fire missions displayed", Logger::LogLevel::INFO);
 }
 
 WeaponType MissionManager::getWeaponType() const {
     const std::pair<int, WeaponType> weaponPins[] = {
-        {PIN(Config::PinConfig::SWITCH_81MM_PIN), WeaponType::MORTAR_81MM},
-        {PIN(Config::PinConfig::SWITCH_155MM_PIN), WeaponType::ARTILLERY_155MM},
-        {PIN(Config::PinConfig::SWITCH_120MM_PIN), WeaponType::TANK_120MM}
+        {PIN(Constants::PinConfig::SWITCH_81MM_PIN), WeaponType::MORTAR_81MM},
+        {PIN(Constants::PinConfig::SWITCH_155MM_PIN), WeaponType::ARTILLERY_155MM},
+        {PIN(Constants::PinConfig::SWITCH_120MM_PIN), WeaponType::TANK_120MM}
     };
 
     for (const auto& [pin, weapon] : weaponPins) {
@@ -417,13 +466,14 @@ WeaponType MissionManager::getWeaponType() const {
 }
 
 void setup() {
-    Serial.begin(Config::Display::BAUD_RATE); // USB to W1
-    Global::loraSerial.begin(Config::Display::BAUD_RATE);
+    Serial.begin(Constants::Display::BAUD_RATE); // USB to W1
+    Global::getLoraSerial().begin(Constants::Display::BAUD_RATE);
     Wire.begin();
     
     setupPins();
-    Global::displayManager.setup();
+    Global::getDisplayManager().setup();
     setupRTC();
+    logger.log("Setup complete", Logger::LogLevel::INFO);
 }
 
 void processSerialData(EnvironmentalDataManager &envManager) {
@@ -439,7 +489,7 @@ void navigateDisplay() {
 }
 
 void loop() {
-    processSerialData(Global::envManager);
+    processSerialData(Global::getEnvManager());
     processLoRaData();
     handleWeaponTypeChange();
     navigateDisplay();
