@@ -58,7 +58,7 @@ public:
     Logger(Print& output) : currentLogLevel(LogLevel::INFO), output(output) {}
 
     void begin(long baudRate) {
-        Serial.begin(baudRate);
+        output.begin(baudRate);
     }
 
     void log(const char* message, LogLevel level = LogLevel::INFO) {
@@ -125,7 +125,7 @@ private:
     Logger& logger;
 
     void initializeSystem() {
-        Serial.begin(Constants::SerialConfig::SERIAL_BAUD_RATE);
+        // Serial.begin(Constants::SerialConfig::SERIAL_BAUD_RATE); // Removed duplicate initialization
         initializeSerialPorts();
         Wire.begin();
         configurePins();
@@ -238,12 +238,11 @@ private:
                  dist_B1, bearing_B1, bearing_target, dist_target);
         loraSerial.println(buffer);
 
-        // Log the sensor data
-        logger.log("Sending sensor data:", Logger::LogLevel::INFO);
-        logger.log("Distance to B1: " + String(dist_B1), Logger::LogLevel::INFO);
-        logger.log("Bearing to B1: " + String(bearing_B1), Logger::LogLevel::INFO);
-        logger.log("Bearing to Target: " + String(bearing_target), Logger::LogLevel::INFO);
-        logger.log("Distance to Target: " + String(dist_target), Logger::LogLevel::INFO);
+        // Consolidate sensor data logging
+        char logBuffer[Constants::Buffer::DATA_BUFFER_SIZE];
+        snprintf(logBuffer, sizeof(logBuffer), "Distance to B1: %.2f, Bearing to B1: %.2f, Bearing to Target: %.2f, Distance to Target: %.2f",
+                 dist_B1, bearing_B1, bearing_target, dist_target);
+        logger.log(logBuffer, Logger::LogLevel::INFO);
     }
 
     enum class LEDState { OFF = LOW, ON = HIGH };
@@ -325,13 +324,14 @@ private:
     }
 };
 
-Logger logger(Serial);
-SensorSystem sensorSystem(logger);
-
 void setup() {
+    static Logger logger(Serial);
+    static SensorSystem sensorSystem(logger);
     sensorSystem.setup();
 }
 
 void loop() {
+    static Logger logger(Serial);
+    static SensorSystem sensorSystem(logger);
     sensorSystem.loop();
 }

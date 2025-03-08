@@ -5,7 +5,6 @@
 #include <cmath>
 #include <vector>
 
-// Constants for configuration
 namespace Constants {
     namespace SerialConfig {
         constexpr int SERIAL_BAUD_RATE = 9600;
@@ -51,13 +50,12 @@ namespace Constants {
         constexpr int SCREEN_HEIGHT = 64;
         constexpr int BAUD_RATE = 9600;
         constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
-        constexpr int DISPLAY_FAILURE_DELAY = 5000; // Delay in milliseconds
-        constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
+        constexpr int DISPLAY_FAILURE_DELAY = 5000;
+        constexpr int DEBOUNCE_DELAY = 200;
         constexpr int DISPLAY_LINES = 4;
     }
 }
 
-// Logger class
 class Logger {
 public:
     enum class LogLevel {
@@ -109,7 +107,7 @@ public:
     void setup() {
         if (!display.begin(SSD1306_SWITCHCAPVCC, Constants::Display::DISPLAY_I2C_ADDRESS)) {
             logger.log("Display failure", Logger::LogLevel::ERROR);
-            delay(Constants::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+            delay(Constants::Display::DISPLAY_FAILURE_DELAY);
         } else {
             initializeDisplay();
         }
@@ -189,9 +187,9 @@ struct TargetData {
 struct FireMission {
     int id;
     int charge;
-    float azimuth; // mils
-    float range;   // meters
-    float elevation; // mils
+    float azimuth;
+    float range;
+    float elevation;
 };
 
 struct EnvironmentalData {
@@ -221,7 +219,7 @@ public:
     }
 
     bool isValid() const {
-        return true; // All values have default initialization, always valid
+        return true;
     }
 };
 
@@ -253,13 +251,13 @@ void setupPins() {
         pinMode(PIN(pin), (pin == Constants::PinConfig::RED_LED_PIN || pin == Constants::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
     });
 
-    setLEDState(true, false); // Red on until W1 connects
+    setLEDState(true, false);
 }
 
 void setupRTC() {
     if (!Global::getRTC().begin()) {
         logger.log("RTC failure", Logger::LogLevel::ERROR);
-        delay(Constants::Display::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
+        delay(Constants::Display::DISPLAY_FAILURE_DELAY);
     } else {
         Global::getRTC().adjust(DateTime(F(__DATE__), F(__TIME__)));
         logger.log("RTC initialized", Logger::LogLevel::INFO);
@@ -299,16 +297,13 @@ void readLoRaData() {
             logger.log("Invalid LoRa data received: " + data, Logger::LogLevel::ERROR);
             return;
         }
-        // Extract target data and process...
         try {
-            // Assuming tokens[0] to tokens[5] contain valid target data
             TargetData target;
             target.id = std::stoi(std::string(tokens[0]));
             target.dist_B1 = std::stof(std::string(tokens[1]));
             target.bearing_B1 = std::stof(std::string(tokens[2]));
             target.bearing_target = std::stof(std::string(tokens[3]));
             target.dist_target = std::stof(std::string(tokens[4]));
-            // Process target data...
             updateLEDAndRecalculate(Global::getEnvManager());
             logger.log("LoRa data processed", Logger::LogLevel::INFO);
         } catch (const std::invalid_argument& e) {
@@ -462,11 +457,11 @@ WeaponType MissionManager::getWeaponType() const {
             return weapon;
         }
     }
-    return WeaponType::MORTAR_81MM; // Default
+    return WeaponType::MORTAR_81MM;
 }
 
 void setup() {
-    Serial.begin(Constants::Display::BAUD_RATE); // USB to W1
+    Serial.begin(Constants::Display::BAUD_RATE);
     Global::getLoraSerial().begin(Constants::Display::BAUD_RATE);
     Wire.begin();
     

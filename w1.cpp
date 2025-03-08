@@ -292,7 +292,7 @@ private:
 class SensorManager {
 public:
     SensorManager(LEDManager& ledManager, Logger& logger)
-        : mag(Config::Sensor::MAG_SENSOR_ID), bme(), lastUpdateMillis(0), errorState(false),
+        : mag(Config::Sensor::MAG_SENSOR_ID), bme(), lastUpdateMillis(0),
           ledManager(ledManager), logger(logger), sensorInitializer(logger), errorManager(ledManager, logger), sensorReader(logger) {}
 
     void setup() {
@@ -315,7 +315,6 @@ private:
     Adafruit_HMC5883_Unified mag;
     Adafruit_BME280 bme;
     unsigned long lastUpdateMillis;
-    bool errorState;
     LEDManager& ledManager;
     Logger& logger;
     SensorInitializer sensorInitializer;
