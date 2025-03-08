@@ -19,14 +19,7 @@ public:
     }
 
     void loop() {
-        if (buttonPressed) {
-            buttonPressed = false;
-            delay(Constants::DEBOUNCE_DELAY_MS); // Debounce delay
-            if (digitalRead(PinConfig::TRIGGER_BUTTON_PIN) == LOW) {
-                onClick();
-            }
-        }
-
+        handleButtonPress();
         if (!sensorsOperational) {
             setLEDState(HIGH, LOW);
         }
@@ -44,6 +37,16 @@ private:
     int flashPin;
     int flashDuration;
     static volatile bool buttonPressed;
+
+    void handleButtonPress() {
+        if (buttonPressed) {
+            buttonPressed = false;
+            delay(Constants::DEBOUNCE_DELAY_MS); // Debounce delay
+            if (digitalRead(PinConfig::TRIGGER_BUTTON_PIN) == LOW) {
+                onClick();
+            }
+        }
+    }
 
     void onClick() {
         if (!sensorsOperational) return;

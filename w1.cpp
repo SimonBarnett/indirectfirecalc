@@ -38,17 +38,8 @@ public:
 
     void log(const char* message, LogLevel level = INFO) {
         if (level >= currentLogLevel) {
-            switch (level) {
-                case INFO:
-                    Serial.print("[INFO] ");
-                    break;
-                case WARNING:
-                    Serial.print("[WARNING] ");
-                    break;
-                case ERROR:
-                    Serial.print("[ERROR] ");
-                    break;
-            }
+            const char* levelStr[] = {"[INFO] ", "[WARNING] ", "[ERROR] "};
+            Serial.print(levelStr[level]);
             Serial.println(message);
         }
     }
@@ -104,15 +95,20 @@ public:
     SensorInitializer(Logger& logger) : logger(logger) {}
 
     bool initializeSensors(Adafruit_HMC5883_Unified& mag, Adafruit_BME280& bme) {
-        if (!mag.begin()) {
-            logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
-            return false;
+        int retryCount = 3;
+        while (retryCount--) {
+            if (mag.begin()) {
+                if (bme.begin(Config::bme280Address)) {
+                    return true;
+                } else {
+                    logger.log("BME280 initialization failed. Check the address and wiring.", Logger::ERROR);
+                }
+            } else {
+                logger.log("Magnetometer initialization failed. Check wiring and try again.", Logger::ERROR);
+            }
+            delay(1000); // Delay before retry
         }
-        if (!bme.begin(Config::bme280Address)) {
-            logger.log("BME280 initialization failed. Check the address and wiring.", Logger::ERROR);
-            return false;
-        }
-        return true;
+        return false;
     }
 
 private:
@@ -238,7 +234,9 @@ private:
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        delayNonBlocking(Config::initDelayMs);
+        while (!delayNonBlocking(Config::initDelayMs)) {
+            // Do nothing, just wait
+        }
         ledManager.setGreenLEDState(false);
     }
 
@@ -246,11 +244,13 @@ private:
         return (currentMillis - lastUpdateMillis) >= Config::updateIntervalMs;
     }
 
-    void delayNonBlocking(unsigned long delayMs) {
-        unsigned long startMillis = millis();
-        while (millis() - startMillis < delayMs) {
-            // Do nothing, just wait
+    bool delayNonBlocking(unsigned long delayMs) {
+        static unsigned long startMillis = millis();
+        if (millis() - startMillis < delayMs) {
+            return false; // Still waiting
         }
+        startMillis = millis(); // Reset start time
+        return true; // Delay complete
     }
 };
 

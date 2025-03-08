@@ -57,7 +57,7 @@ std::vector<std::string> splitString(const std::string &str, char delimiter) {
     std::stringstream ss(str);
     std::string token;
     while (std::getline(ss, token, delimiter)) {
-        tokens.push_back(token);
+        tokens.emplace_back(std::move(token));
     }
     return tokens;
 }
@@ -148,11 +148,15 @@ public:
 
     void updateEnvData(const std::vector<std::string>& tokens) {
         if (tokens.size() >= 5) {
-            data.wind_speed = std::stof(tokens[0]);
-            data.wind_dir = std::stof(tokens[1]);
-            data.pressure = std::stof(tokens[2]);
-            data.temp = std::stof(tokens[3]);
-            data.humidity = std::stof(tokens[4]);
+            try {
+                data.wind_speed = std::stof(tokens[0]);
+                data.wind_dir = std::stof(tokens[1]);
+                data.pressure = std::stof(tokens[2]);
+                data.temp = std::stof(tokens[3]);
+                data.humidity = std::stof(tokens[4]);
+            } catch (const std::invalid_argument& e) {
+                Serial.println("Invalid environmental data format");
+            }
         }
     }
 
@@ -180,15 +184,8 @@ public:
 MissionManager manager;
 
 void setupPins() {
-    const int pins[] = {
-        static_cast<int>(Config::PinConfig::UP_PIN), static_cast<int>(Config::PinConfig::DOWN_PIN), 
-        static_cast<int>(Config::PinConfig::SWITCH_81MM_PIN), static_cast<int>(Config::PinConfig::SWITCH_155MM_PIN), 
-        static_cast<int>(Config::PinConfig::SWITCH_120MM_PIN), static_cast<int>(Config::PinConfig::RED_LED_PIN), 
-        static_cast<int>(Config::PinConfig::GREEN_LED_PIN)
-    };
-
-    for (auto pin : pins) {
-        pinMode(pin, (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
+    for (const auto pin : {Config::PinConfig::UP_PIN, Config::PinConfig::DOWN_PIN, Config::PinConfig::SWITCH_81MM_PIN, Config::PinConfig::SWITCH_155MM_PIN, Config::PinConfig::SWITCH_120MM_PIN, Config::PinConfig::RED_LED_PIN, Config::PinConfig::GREEN_LED_PIN}) {
+        pinMode(static_cast<int>(pin), (pin == Config::PinConfig::RED_LED_PIN || pin == Config::PinConfig::GREEN_LED_PIN) ? OUTPUT : INPUT_PULLUP);
     }
     setLEDState(true, false); // Red on until W1 connects
 }
@@ -204,8 +201,8 @@ void setupRTC() {
 
 void readEnvData() {
     if (Serial.available()) {
-        std::string envData = Serial.readStringUntil('\n').c_str();
-        auto tokens = splitString(envData, ',');
+        String envData = Serial.readStringUntil('\n');
+        auto tokens = splitString(envData.c_str(), ',');
         envManager.updateEnvData(tokens);
         if (envManager.isValid()) {
             setLEDState(false, true);
@@ -218,32 +215,35 @@ void readEnvData() {
 
 void readLoRaData() {
     if (loraSerial.available()) {
-        std::string data = loraSerial.readStringUntil('\n').c_str();
-        if (data.find(',') == std::string::npos) {
+        String data = loraSerial.readStringUntil('\n');
+        if (data.indexOf(',') == -1) {
             Serial.println("Invalid LoRa data received");
             return;
         }
-        if (data.find(',') == 1) {
+        if (data.indexOf(',') == 1) {
             DateTime now = rtc.now();
-            loraSerial.println("B1," + std::to_string(now.unixtime()));
+            loraSerial.println("B1," + String(now.unixtime()));
         } else {
             TargetData target;
-            int id = std::stoi(data.substr(0, 1));
-            target.id = id;
-            auto tokens = splitString(data, ',');
-            if (tokens.size() >= 6) {
-                target.dist_B1 = std::stof(tokens[2]);
-                target.bearing_B1 = std::stof(tokens[3]);
-                target.bearing_target = std::stof(tokens[4]);
-                target.dist_target = std::stof(tokens[5]);
+            try {
+                target.id = std::stoi(data.substring(0, 1).c_str());
+                auto tokens = splitString(data.c_str(), ',');
+                if (tokens.size() >= 6) {
+                    target.dist_B1 = std::stof(tokens[2]);
+                    target.bearing_B1 = std::stof(tokens[3]);
+                    target.bearing_target = std::stof(tokens[4]);
+                    target.dist_target = std::stof(tokens[5]);
 
-                if (manager.missionCount < Config::MAX_MISSIONS) {
-                    manager.targets[manager.missionCount++] = target;
-                } else {
-                    std::rotate(manager.targets.begin(), manager.targets.begin() + 1, manager.targets.end());
-                    manager.targets.back() = target;
+                    if (manager.missionCount < Config::MAX_MISSIONS) {
+                        manager.targets[manager.missionCount++] = target;
+                    } else {
+                        std::rotate(manager.targets.begin(), manager.targets.begin() + 1, manager.targets.end());
+                        manager.targets.back() = target;
+                    }
+                    manager.recalculateAllMissions();
                 }
-                manager.recalculateAllMissions();
+            } catch (const std::invalid_argument& e) {
+                Serial.println("Invalid target data format");
             }
         }
     }
@@ -277,7 +277,7 @@ float toRadians(float degrees) {
 void MissionManager::recalculateAllMissions() {
     if (missionCount == 0) return;  // Simplified check
     WeaponType weapon = getWeaponType();
-    for (int i = 0; i < missionCount; i++) {
+    for (int i = 0; i < missionCount; ++i) {
         computeTarget(targets[i], missions[i], weapon);
         missions[i].id = targets[i].id;
     }
@@ -328,7 +328,7 @@ float calculateAzimuth(float x_t, float y_t) {
 
 int determineCharge(float range, WeaponType weapon) {
     const auto& properties = weaponProperties.at(weapon);
-    for (int i = 0; i < properties.maxCharges; i++) {
+    for (int i = 0; i < properties.maxCharges; ++i) {
         float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::GRAVITY;
         if (weapon == WeaponType::TANK_120MM) max_range = 5000;
         if (range <= max_range * 1.1) {
@@ -364,7 +364,7 @@ void MissionManager::displayFireMissions() const {
     WeaponType weapon = getWeaponType();
     std::string weaponLabel = (weapon == WeaponType::MORTAR_81MM) ? "81mm Mortar" : (weapon == WeaponType::ARTILLERY_155MM) ? "155mm Artillery" : "120mm Tank";
     displayManager.println("Weapon: " + weaponLabel);
-    for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; i++) {
+    for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; ++i) {
         displayManager.print("FM "); displayManager.print(std::to_string(missions[i].id));
         displayManager.print(": Chg "); displayManager.print(std::to_string(missions[i].charge));
         displayManager.print(", Azi "); displayManager.print(std::to_string(static_cast<int>(missions[i].azimuth)));
