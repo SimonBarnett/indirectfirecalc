@@ -18,6 +18,15 @@ struct Config {
 // Constants
 constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
+constexpr int WIND_SPEED_PIN = A0;
+constexpr int SENSOR_FAIL_RED_PIN = 2;
+constexpr int SENSOR_OK_GREEN_PIN = 3;
+constexpr int WIND_SPEED_MAX_RAW = 1023;
+constexpr int WIND_SPEED_MAX_MPS = 30;
+constexpr long BAUD_RATE = 9600;
+constexpr int BLINK_INTERVAL_MS = 500;
+constexpr uint8_t BME280_ADDRESS = 0x76;
+constexpr int MAG_SENSOR_ID = 12345;
 
 // Logger class
 class Logger {
@@ -31,11 +40,12 @@ public:
     }
 
     static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
-        Serial.print(speed); Serial.print(",");
-        Serial.print(dir); Serial.print(",");
-        Serial.print(pressure); Serial.print(",");
-        Serial.print(temp); Serial.print(",");
-        Serial.println(humidity);
+        float sensorData[] = {speed, dir, pressure, temp, humidity};
+        for (int i = 0; i < 5; ++i) {
+            Serial.print(sensorData[i]);
+            if (i < 4) Serial.print(",");
+        }
+        Serial.println();
     }
 };
 
@@ -68,7 +78,7 @@ private:
 class SensorManager {
 public:
     SensorManager(const Config& config)
-        : config(config), mag(config.magSensorId), lastUpdate(0), errorState(false),
+        : config(config), mag(config.magSensorId), bme(), lastUpdate(0), errorState(false),
           ledManager(config.sensorFailRedPin, config.sensorOkGreenPin) {}
 
     void setup() {
@@ -122,12 +132,15 @@ private:
                 ledManager.setRedLEDState(!digitalRead(config.sensorFailRedPin));
                 lastBlinkTime = currentMillis;
             }
+            delay(10); 
         }
     }
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        delay(INIT_DELAY_MS);
+        unsigned long startMillis = millis();
+        while (millis() - startMillis < INIT_DELAY_MS) {
+        }
         ledManager.setGreenLEDState(false);
     }
 
@@ -162,15 +175,15 @@ private:
 
 // Configuration and setup
 Config config = {
-    .windSpeedPin = A0,
-    .sensorFailRedPin = 2,
-    .sensorOkGreenPin = 3,
-    .windSpeedMaxRaw = 1023,
-    .windSpeedMaxMps = 30,
-    .baudRate = 9600,
-    .blinkIntervalMs = 500,
-    .bme280Address = 0x76,
-    .magSensorId = 12345
+    .windSpeedPin = WIND_SPEED_PIN,
+    .sensorFailRedPin = SENSOR_FAIL_RED_PIN,
+    .sensorOkGreenPin = SENSOR_OK_GREEN_PIN,
+    .windSpeedMaxRaw = WIND_SPEED_MAX_RAW,
+    .windSpeedMaxMps = WIND_SPEED_MAX_MPS,
+    .baudRate = BAUD_RATE,
+    .blinkIntervalMs = BLINK_INTERVAL_MS,
+    .bme280Address = BME280_ADDRESS,
+    .magSensorId = MAG_SENSOR_ID
 };
 
 SensorManager sensorManager(config);

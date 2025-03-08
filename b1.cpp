@@ -1,3 +1,4 @@
+
 #include <Adafruit_SSD1306.h>
 #include <RTC_DS3231.h>
 #include <SoftwareSerial.h>
@@ -34,7 +35,11 @@ namespace Config {
 }
 
 // Weapon types
-enum WeaponType { MORTAR_81MM, ARTILLERY_155MM, TANK_120MM };
+enum WeaponType {
+    MORTAR_81MM, 
+    ARTILLERY_155MM, 
+    TANK_120MM 
+};
 
 // Data structure to store weapon properties
 struct WeaponProperties {
@@ -53,14 +58,11 @@ const std::map<WeaponType, WeaponProperties> weaponProperties = {
 // Helper function to split string
 std::vector<std::string> splitString(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
-    size_t start = 0;
-    size_t end = str.find(delimiter);
-    while (end != std::string::npos) {
-        tokens.push_back(str.substr(start, end - start));
-        start = end + 1;
-        end = str.find(delimiter, start);
+    std::stringstream ss(str);
+    std::string token;
+    while (std::getline(ss, token, delimiter)) {
+        tokens.push_back(token);
     }
-    tokens.push_back(str.substr(start));
     return tokens;
 }
 
@@ -76,8 +78,9 @@ public:
         if (!display.begin(SSD1306_SWITCHCAPVCC, Config::DISPLAY_I2C_ADDRESS)) {
             Serial.println("Display failure");
             delay(5000); // Wait 5 seconds before attempting a reset
+        } else {
+            initializeDisplay();
         }
-        initializeDisplay();
     }
 
     void initializeDisplay() {
@@ -195,8 +198,9 @@ void setupRTC() {
     if (!rtc.begin()) {
         Serial.println("RTC failure");
         delay(5000); // Wait 5 seconds before attempting a reset
+    } else {
+        rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
-    rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
 }
 
 void readEnvData() {
