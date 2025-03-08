@@ -1,13 +1,12 @@
-#include <Wire.h>                 // Standard library includes
+#include <Wire.h>
 #include <vector>
 #include <map>
-
-#include <Adafruit_SSD1306.h>     // Third-party libraries
+#include <Adafruit_SSD1306.h>
 #include <RTC_DS3231.h>
 #include <SoftwareSerial.h>
-
-// Project-specific headers (if any)
-// #include "my_header.h" 
+#include <string>
+#include <sstream>
+#include <cmath>
 
 namespace Config {
     constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
@@ -18,6 +17,10 @@ namespace Config {
     constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
     constexpr int DISPLAY_FAILURE_DELAY = 5000; // Delay in milliseconds
     constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
+    constexpr int DISPLAY_LINES = 4;
+
+    constexpr float PI = 3.14159265358979323846;
+    constexpr float GRAVITY = 9.81;
 
     enum PinConfig {
         UP_PIN = 3,
@@ -32,12 +35,10 @@ namespace Config {
     };
 }
 
-constexpr float PI = 3.14159265358979323846;
-
 enum WeaponType {
-    MORTAR_81MM, 
-    ARTILLERY_155MM, 
-    TANK_120MM 
+    MORTAR_81MM,
+    ARTILLERY_155MM,
+    TANK_120MM
 };
 
 struct WeaponProperties {
@@ -146,8 +147,8 @@ public:
 
     void recalculateAllMissions();
     void computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon);
-    void displayFireMissions();
-    WeaponType getWeaponType();
+    void displayFireMissions() const;
+    WeaponType getWeaponType() const;
 };
 
 MissionManager manager;
@@ -178,7 +179,7 @@ void setupRTC() {
 }
 
 void readEnvData() {
-    if (Serial.available()) { // Update environmental data from W1
+    if (Serial.available()) {
         std::string envData = Serial.readStringUntil('\n').c_str();
         auto tokens = splitString(envData, ',');
         if (tokens.size() >= 5) {
@@ -188,21 +189,21 @@ void readEnvData() {
             manager.temp = std::stof(tokens[3]);
             manager.humidity = std::stof(tokens[4]);
             manager.envDataValid = true;
-            setLEDState(false, true);   // Green on when W1 connected
+            setLEDState(false, true);
             manager.recalculateAllMissions();
         }
     } else if (!manager.envDataValid) {
-        setLEDState(true, false);  // Red on if no W1 data
+        setLEDState(true, false);
     }
 }
 
 void readLoRaData() {
     if (loraSerial.available()) {
         std::string data = loraSerial.readStringUntil('\n').c_str();
-        if (data.find(',') == 1) { // Request: "1,timestamp"
+        if (data.find(',') == 1) {
             DateTime now = rtc.now();
             loraSerial.println("B1," + std::to_string(now.unixtime()));
-        } else { // Result: "1,timestamp,dist,bearing1,bearing2,dist_target"
+        } else {
             TargetData target;
             int id = std::stoi(data.substr(0, 1));
             target.id = id;
@@ -227,7 +228,7 @@ void readLoRaData() {
 
 void handleWeaponTypeChange() {
     WeaponType currentWeapon = manager.getWeaponType();
-    if (currentWeapon != manager.lastWeapon) { // Recalculate on weapon type change
+    if (currentWeapon != manager.lastWeapon) {
         manager.lastWeapon = currentWeapon;
         manager.recalculateAllMissions();
     }
@@ -237,30 +238,30 @@ void handleDisplayNavigation() {
     if (digitalRead(Config::UP_PIN) == LOW && manager.displayStart > 0) {
         manager.displayStart--;
         manager.displayFireMissions();
-        delay(Config::DEBOUNCE_DELAY); // Debounce
+        delay(Config::DEBOUNCE_DELAY);
     }
     if (digitalRead(Config::DOWN_PIN) == LOW && manager.displayStart + Config::DISPLAY_LINES < manager.missionCount) {
         manager.displayStart++;
         manager.displayFireMissions();
-        delay(Config::DEBOUNCE_DELAY); // Debounce
+        delay(Config::DEBOUNCE_DELAY);
     }
 }
 
 void MissionManager::recalculateAllMissions() {
-    if (!envDataValid && missionCount == 0) return; // No data to recalculate if no initial data
+    if (!envDataValid && missionCount == 0) return;
     WeaponType weapon = getWeaponType();
     for (int i = 0; i < missionCount; i++) {
         computeTarget(targets[i], missions[i], weapon);
-        missions[i].id = targets[i].id; // Preserve ID
+        missions[i].id = targets[i].id;
     }
     displayFireMissions();
 }
 
 void MissionManager::computeTarget(const TargetData& target, FireMission& mission, WeaponType weapon) {
-    float rad_B1 = target.bearing_B1 * PI / 180;
+    float rad_B1 = target.bearing_B1 * Config::PI / 180;
     float x_s = target.dist_B1 * sin(rad_B1);
     float y_s = target.dist_B1 * cos(rad_B1);
-    float rad_t = target.bearing_target * PI / 180;
+    float rad_t = target.bearing_target * Config::PI / 180;
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
 
@@ -270,7 +271,7 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
 
-    float wind_rad = wind_dir * PI / 180;
+    float wind_rad = wind_dir * Config::PI / 180;
     float wind_x = wind_speed * cos(wind_rad);
     float wind_y = wind_speed * sin(wind_rad);
 
@@ -279,12 +280,12 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     y_t += wind_y * properties.tof;
 
     mission.range = sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
-    mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * PI));
+    mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * Config::PI));
     if (mission.azimuth < 0) mission.azimuth += 6400;
 
     mission.charge = 0;
     for (int i = 0; i < properties.maxCharges; i++) {
-        float max_range = (properties.velocities[i] * properties.velocities[i]) / 9.81;
+        float max_range = (properties.velocities[i] * properties.velocities[i]) / Config::GRAVITY;
         if (weapon == TANK_120MM) max_range = 5000;
         if (mission.range <= max_range * 1.1) {
             mission.charge = i;
@@ -295,13 +296,13 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float v_chosen = properties.velocities[mission.charge];
 
     if (weapon == TANK_120MM) {
-        mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * PI));
+        mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * Config::PI));
     } else {
-        mission.elevation = 0.5 * asin((mission.range * 9.81) / (v_chosen * v_chosen)) * (6400 / (2 * PI));
+        mission.elevation = 0.5 * asin((mission.range * Config::GRAVITY) / (v_chosen * v_chosen)) * (6400 / (2 * Config::PI));
     }
 }
 
-void MissionManager::displayFireMissions() {
+void MissionManager::displayFireMissions() const {
     displayManager.clearDisplay();
     displayManager.setCursor(0, 0);
     WeaponType weapon = getWeaponType();
@@ -310,14 +311,14 @@ void MissionManager::displayFireMissions() {
     for (int i = displayStart; i < missionCount && i < displayStart + Config::DISPLAY_LINES; i++) {
         displayManager.print("FM "); displayManager.print(std::to_string(missions[i].id));
         displayManager.print(": Chg "); displayManager.print(std::to_string(missions[i].charge));
-        displayManager.print(", Azi "); displayManager.print(std::to_string((int)missions[i].azimuth));
-        displayManager.print(", Rng "); displayManager.print(std::to_string((int)missions[i].range));
-        displayManager.print(", Ele "); displayManager.println(std::to_string((int)missions[i].elevation));
+        displayManager.print(", Azi "); displayManager.print(std::to_string(static_cast<int>(missions[i].azimuth)));
+        displayManager.print(", Rng "); displayManager.print(std::to_string(static_cast<int>(missions[i].range)));
+        displayManager.print(", Ele "); displayManager.println(std::to_string(static_cast<int>(missions[i].elevation)));
     }
     displayManager.displayContent();
 }
 
-WeaponType MissionManager::getWeaponType() {
+WeaponType MissionManager::getWeaponType() const {
     const std::pair<int, WeaponType> weaponPins[] = {
         {Config::SWITCH_81MM_PIN, MORTAR_81MM},
         {Config::SWITCH_155MM_PIN, ARTILLERY_155MM},

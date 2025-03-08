@@ -1,17 +1,19 @@
 #include <Adafruit_HMC5883_U.h>
 #include <Adafruit_BME280.h>
+#include <Arduino.h>
+#include <Wire.h>
 
 // Configuration parameters
 struct Config {
-    int windSpeedPin = A0;
-    int sensorFailRedPin = 2;
-    int sensorOkGreenPin = 3;
-    int windSpeedMaxRaw = 1023;
-    int windSpeedMaxMps = 30;
-    long baudRate = 9600;
-    int blinkIntervalMs = 500;
-    uint8_t bme280Address = 0x76;
-    int magSensorId = 12345;
+    static constexpr int windSpeedPin = A0;
+    static constexpr int sensorFailRedPin = 2;
+    static constexpr int sensorOkGreenPin = 3;
+    static constexpr int windSpeedMaxRaw = 1023;
+    static constexpr int windSpeedMaxMps = 30;
+    static constexpr long baudRate = 9600;
+    static constexpr int blinkIntervalMs = 500;
+    static constexpr uint8_t bme280Address = 0x76;
+    static constexpr int magSensorId = 12345;
 };
 
 // Constants
@@ -22,15 +24,15 @@ constexpr int NUM_SENSOR_DATA = 5;
 // Logger class
 class Logger {
 public:
-    static inline void begin(long baudRate) {
+    static void begin(long baudRate) {
         Serial.begin(baudRate);
     }
 
-    static inline void log(const char* message) {
+    static void log(const char* message) {
         Serial.println(message);
     }
 
-    static inline void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
+    static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
         float sensorData[NUM_SENSOR_DATA] = {speed, dir, pressure, temp, humidity};
         for (int i = 0; i < NUM_SENSOR_DATA; ++i) {
             Serial.print(sensorData[i]);
@@ -68,12 +70,12 @@ private:
 // Sensor Manager class
 class SensorManager {
 public:
-    SensorManager(const Config& config)
-        : config(config), mag(config.magSensorId), bme(), lastUpdate(0), errorState(false),
-          ledManager(config.sensorFailRedPin, config.sensorOkGreenPin) {}
+    SensorManager()
+        : mag(Config::magSensorId), bme(), lastUpdate(0), errorState(false),
+          ledManager(Config::sensorFailRedPin, Config::sensorOkGreenPin) {}
 
     void setup() {
-        Logger::begin(config.baudRate);
+        Logger::begin(Config::baudRate);
         Wire.begin();
         ledManager.setup();
 
@@ -93,7 +95,6 @@ public:
     }
 
 private:
-    const Config& config;
     Adafruit_HMC5883_Unified mag;
     Adafruit_BME280 bme;
     unsigned long lastUpdate;
@@ -105,7 +106,7 @@ private:
             Logger::log("Magnetometer initialization failed");
             return false;
         }
-        if (!bme.begin(config.bme280Address)) {
+        if (!bme.begin(Config::bme280Address)) {
             Logger::log("BME280 initialization failed");
             return false;
         }
@@ -115,12 +116,19 @@ private:
     void handleSensorError() {
         errorState = true;
         Logger::log("Sensor failure");
-        blinkLED(config.sensorFailRedPin, config.blinkIntervalMs, INT_MAX);
+        ledManager.setRedLEDState(true);
+        // Non-blocking LED blink
+        unsigned long startMillis = millis();
+        while (millis() - startMillis < Config::blinkIntervalMs) {
+            ledManager.setRedLEDState(!ledManager.getRedLEDState());
+            delay(Config::blinkIntervalMs);
+        }
+        ledManager.setRedLEDState(false);
     }
 
     void indicateSuccessfulStartup() {
         ledManager.setGreenLEDState(true);
-        blinkLED(config.sensorOkGreenPin, config.blinkIntervalMs, INIT_DELAY_MS);
+        delay(INIT_DELAY_MS);
         ledManager.setGreenLEDState(false);
     }
 
@@ -139,8 +147,8 @@ private:
     }
 
     float getWindSpeed() {
-        int raw = analogRead(config.windSpeedPin);
-        return map(raw, 0, config.windSpeedMaxRaw, 0, config.windSpeedMaxMps) * 0.1;
+        int raw = analogRead(Config::windSpeedPin);
+        return map(raw, 0, Config::windSpeedMaxRaw, 0, Config::windSpeedMaxMps) * 0.1;
     }
 
     float getWindDirection() {
@@ -158,24 +166,10 @@ private:
     bool isReadingValid(float speed, float dir, float pressure, float temp, float humidity) {
         return !isnan(speed) && !isnan(dir) && !isnan(pressure) && !isnan(temp) && !isnan(humidity);
     }
-
-    void blinkLED(int pin, int intervalMs, int durationMs) {
-        unsigned long startMillis = millis();
-        bool ledState = false;
-        while (millis() - startMillis < durationMs) {
-            unsigned long currentMillis = millis();
-            if (currentMillis - startMillis >= intervalMs) {
-                ledState = !ledState;
-                digitalWrite(pin, ledState ? HIGH : LOW);
-                startMillis = currentMillis;
-            }
-        }
-    }
 };
 
 // Configuration and setup
-Config config;
-SensorManager sensorManager(config);
+SensorManager sensorManager;
 
 void setup() {
     sensorManager.setup();

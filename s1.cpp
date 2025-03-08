@@ -47,7 +47,7 @@ public:
         Wire.begin();
 
         configurePins();
-        setLEDs(LOW, LOW);
+        setLEDState(LOW, LOW);
 
         if (!initializeSensors()) {
             handleSensorFailure();
@@ -55,13 +55,13 @@ public:
             startFlashLED(PinConfig::GREEN_LED_PIN, Constants::LED_FLASH_DURATION_MS);
         }
 
-        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), []() { instance->onClick(); }, FALLING);
+        attachInterrupt(digitalPinToInterrupt(PinConfig::TRIGGER_BUTTON_PIN), [this]() { this->onClick(); }, FALLING);
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
 
     void loop() {
         if (!sensorsOperational) {
-            setLEDs(HIGH, LOW);
+            setLEDState(HIGH, LOW);
         }
         handleFlashLED();
     }
@@ -76,8 +76,6 @@ private:
     bool flashing;
     int flashPin;
     int flashDuration;
-
-    static SensorSystem* instance;
 
     void onClick() {
         if (!sensorsOperational) return;
@@ -102,8 +100,9 @@ private:
         unsigned long start = millis();
         while (millis() - start < Constants::RESPONSE_TIMEOUT_MS) {
             if (loraSerial.available()) {
-                String response = loraSerial.readStringUntil('\n');
-                if (response.startsWith(Constants::RESPONSE_PREFIX)) {
+                char response[Constants::BUFFER_SIZE];
+                loraSerial.readBytesUntil('\n', response, sizeof(response));
+                if (strncmp(response, Constants::RESPONSE_PREFIX, strlen(Constants::RESPONSE_PREFIX)) == 0) {
                     return processResponse(response);
                 }
             }
@@ -111,8 +110,8 @@ private:
         return false;
     }
 
-    bool processResponse(const String& response) {
-        float b1Time = response.substring(strlen(Constants::RESPONSE_PREFIX)).toFloat();
+    bool processResponse(const char* response) {
+        float b1Time = atof(response + strlen(Constants::RESPONSE_PREFIX));
         float dist_B1 = getDistanceFromB1(b1Time);
         float bearing_B1 = getBearing();
         float bearing_target = getBearing();
@@ -120,7 +119,7 @@ private:
 
         if (isnan(bearing_B1) || isnan(bearing_target) || isnan(dist_target)) {
             sensorsOperational = false;
-            setLEDs(HIGH, LOW);
+            setLEDState(HIGH, LOW);
             return false;
         }
 
@@ -129,8 +128,8 @@ private:
     }
 
     float getDistanceFromB1(float b1Time) {
-        float now = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
-        return (now - b1Time) * Constants::SPEED_OF_LIGHT;
+        const float currentTime = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
+        return (currentTime - b1Time) * Constants::SPEED_OF_LIGHT;
     }
 
     float getBearing() {
@@ -143,8 +142,10 @@ private:
 
     float getDistanceToTarget() {
         rangeSerial.println(Constants::RANGE_COMMAND);
+        char response[Constants::BUFFER_SIZE];
         if (rangeSerial.available()) {
-            return rangeSerial.readStringUntil('\n').toFloat();
+            rangeSerial.readBytesUntil('\n', response, sizeof(response));
+            return atof(response);
         }
         return Constants::DEFAULT_DISTANCE;
     }
@@ -157,7 +158,7 @@ private:
         loraSerial.println(buffer);
     }
 
-    void setLEDs(int redState, int greenState) {
+    void setLEDState(int redState, int greenState) {
         digitalWrite(PinConfig::RED_LED_PIN, redState);
         digitalWrite(PinConfig::GREEN_LED_PIN, greenState);
     }
@@ -171,15 +172,11 @@ private:
 
     void handleFlashLED() {
         if (flashing) {
-            unsigned long currentTime = millis();
-            if (currentTime - lastFlashTime >= flashDuration) {
-                digitalWrite(flashPin, LOW);
-                flashing = false;
-            } else if ((currentTime / Constants::LED_BLINK_INTERVAL_MS) % 2 == 0) {
-                digitalWrite(flashPin, HIGH);
-            } else {
-                digitalWrite(flashPin, LOW);
-            }
+            const unsigned long currentTime = millis();
+            const bool isTimeToTurnOff = currentTime - lastFlashTime >= flashDuration;
+            const bool isBlinkOn = (currentTime / Constants::LED_BLINK_INTERVAL_MS) % 2 == 0;
+            digitalWrite(flashPin, isTimeToTurnOff ? LOW : isBlinkOn ? HIGH : LOW);
+            flashing = !isTimeToTurnOff;
         }
     }
 
@@ -197,7 +194,7 @@ private:
 
     void handleSensorFailure() {
         sensorsOperational = false;
-        setLEDs(HIGH, LOW);
+        setLEDState(HIGH, LOW);
         Serial.println("Sensor failure");
         // Implement a proper reset or recovery mechanism
     }
@@ -209,12 +206,9 @@ private:
     }
 };
 
-SensorSystem* SensorSystem::instance = nullptr;
-
 SensorSystem sensorSystem(loraSerial, rangeSerial, mag, rtc);
 
 void setup() {
-    SensorSystem::instance = &sensorSystem;
     sensorSystem.setup();
 }
 
