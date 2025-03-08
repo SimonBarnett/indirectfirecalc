@@ -1,9 +1,13 @@
-#include <Adafruit_SSD1306.h>
-#include <RTC_DS3231.h>
-#include <SoftwareSerial.h>
+#include <Wire.h>                 // Standard library includes
 #include <vector>
 #include <map>
-#include <Wire.h>
+
+#include <Adafruit_SSD1306.h>     // Third-party libraries
+#include <RTC_DS3231.h>
+#include <SoftwareSerial.h>
+
+// Project-specific headers (if any)
+// #include "my_header.h" 
 
 namespace Config {
     constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)

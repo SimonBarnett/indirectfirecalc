@@ -1,4 +1,3 @@
-#include <Wire.h>
 #include <Adafruit_HMC5883_U.h>
 #include <Adafruit_BME280.h>
 
@@ -23,15 +22,15 @@ constexpr int NUM_SENSOR_DATA = 5;
 // Logger class
 class Logger {
 public:
-    static void begin(long baudRate) {
+    static inline void begin(long baudRate) {
         Serial.begin(baudRate);
     }
 
-    static void log(const String& message) {
+    static inline void log(const char* message) {
         Serial.println(message);
     }
 
-    static void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
+    static inline void logSensorData(float speed, float dir, float pressure, float temp, float humidity) {
         float sensorData[NUM_SENSOR_DATA] = {speed, dir, pressure, temp, humidity};
         for (int i = 0; i < NUM_SENSOR_DATA; ++i) {
             Serial.print(sensorData[i]);
@@ -94,7 +93,7 @@ public:
     }
 
 private:
-    Config config;
+    const Config& config;
     Adafruit_HMC5883_Unified mag;
     Adafruit_BME280 bme;
     unsigned long lastUpdate;
@@ -175,14 +174,13 @@ private:
 };
 
 // Configuration and setup
+Config config;
+SensorManager sensorManager(config);
+
 void setup() {
-    Config config;
-    SensorManager sensorManager(config);
     sensorManager.setup();
 }
 
 void loop() {
-    static Config config;
-    static SensorManager sensorManager(config);
     sensorManager.loop();
 }
