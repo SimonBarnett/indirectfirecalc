@@ -2,21 +2,24 @@
 #include <Adafruit_HMC5883_U.h>
 #include <Adafruit_BME280.h>
 
-// Pins
-constexpr int WIND_SPEED_PIN = A0;
-constexpr int SENSOR_FAIL_RED_PIN = 2;
-constexpr int SENSOR_OK_GREEN_PIN = 3;
+// Configuration parameters
+struct Config {
+    int windSpeedPin;
+    int sensorFailRedPin;
+    int sensorOkGreenPin;
+    int windSpeedMaxRaw;
+    int windSpeedMaxMps;
+    long baudRate;
+    int blinkIntervalMs;
+    uint8_t bme280Address;
+    int magSensorId;
+};
 
 // Constants
-constexpr int WIND_SPEED_MAX_RAW = 1023;
-constexpr int WIND_SPEED_MAX_MPS = 30;
 constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
-constexpr int MAG_SENSOR_ID = 12345;
-constexpr uint8_t DEFAULT_BME280_ADDRESS = 0x76;
-constexpr long BAUD_RATE = 9600;
-constexpr int BLINK_INTERVAL_MS = 500;
 
+// Logger class
 class Logger {
 public:
     static void begin(long baudRate) {
@@ -36,29 +39,42 @@ public:
     }
 };
 
+// LED Manager class
 class LEDManager {
 public:
-    static void setup() {
-        pinMode(SENSOR_FAIL_RED_PIN, OUTPUT);
-        pinMode(SENSOR_OK_GREEN_PIN, OUTPUT);
-        setLEDState(SENSOR_FAIL_RED_PIN, LOW);
-        setLEDState(SENSOR_OK_GREEN_PIN, LOW);
-    }
-
-    static void setLEDState(int pin, bool state) {
-        digitalWrite(pin, state ? HIGH : LOW);
-    }
-};
-
-class SensorManager {
-public:
-    SensorManager(uint8_t bme280Address = DEFAULT_BME280_ADDRESS)
-        : bme280Address(bme280Address), mag(MAG_SENSOR_ID), lastUpdate(0), errorState(false) {}
+    LEDManager(int redPin, int greenPin) : redPin(redPin), greenPin(greenPin) {}
 
     void setup() {
-        Logger::begin(BAUD_RATE);
+        pinMode(redPin, OUTPUT);
+        pinMode(greenPin, OUTPUT);
+        setRedLEDState(false);
+        setGreenLEDState(false);
+    }
+
+    void setRedLEDState(bool state) {
+        digitalWrite(redPin, state ? HIGH : LOW);
+    }
+
+    void setGreenLEDState(bool state) {
+        digitalWrite(greenPin, state ? HIGH : LOW);
+    }
+
+private:
+    int redPin;
+    int greenPin;
+};
+
+// Sensor Manager class
+class SensorManager {
+public:
+    SensorManager(const Config& config)
+        : config(config), mag(config.magSensorId), lastUpdate(0), errorState(false),
+          ledManager(config.sensorFailRedPin, config.sensorOkGreenPin) {}
+
+    void setup() {
+        Logger::begin(config.baudRate);
         Wire.begin();
-        LEDManager::setup();
+        ledManager.setup();
 
         if (!initializeSensors()) {
             handleSensorError();
@@ -76,18 +92,19 @@ public:
     }
 
 private:
+    Config config;
     Adafruit_HMC5883_Unified mag;
     Adafruit_BME280 bme;
-    uint8_t bme280Address;
     unsigned long lastUpdate;
     bool errorState;
+    LEDManager ledManager;
 
     bool initializeSensors() {
         if (!mag.begin()) {
             Logger::log("Magnetometer initialization failed");
             return false;
         }
-        if (!bme.begin(bme280Address)) {
+        if (!bme.begin(config.bme280Address)) {
             Logger::log("BME280 initialization failed");
             return false;
         }
@@ -96,18 +113,22 @@ private:
 
     void handleSensorError() {
         errorState = true;
-        LEDManager::setLEDState(SENSOR_FAIL_RED_PIN, HIGH);
+        ledManager.setRedLEDState(true);
         Logger::log("Sensor failure");
+        unsigned long lastBlinkTime = millis();
         while (errorState) {
-            LEDManager::setLEDState(SENSOR_FAIL_RED_PIN, !digitalRead(SENSOR_FAIL_RED_PIN));
-            delay(BLINK_INTERVAL_MS);
+            unsigned long currentMillis = millis();
+            if (currentMillis - lastBlinkTime >= config.blinkIntervalMs) {
+                ledManager.setRedLEDState(!digitalRead(config.sensorFailRedPin));
+                lastBlinkTime = currentMillis;
+            }
         }
     }
 
     void indicateSuccessfulStartup() {
-        LEDManager::setLEDState(SENSOR_OK_GREEN_PIN, HIGH);
+        ledManager.setGreenLEDState(true);
         delay(INIT_DELAY_MS);
-        LEDManager::setLEDState(SENSOR_OK_GREEN_PIN, LOW);
+        ledManager.setGreenLEDState(false);
     }
 
     void updateSensorReadings() {
@@ -118,16 +139,16 @@ private:
         float humidity = bme.readHumidity();
 
         if (isnan(speed) || isnan(dir) || isnan(pressure) || isnan(temp) || isnan(humidity)) {
-            LEDManager::setLEDState(SENSOR_FAIL_RED_PIN, HIGH);
+            ledManager.setRedLEDState(true);
         } else {
-            LEDManager::setLEDState(SENSOR_FAIL_RED_PIN, LOW);
+            ledManager.setRedLEDState(false);
             Logger::logSensorData(speed, dir, pressure, temp, humidity);
         }
     }
 
     float getWindSpeed() {
-        int raw = analogRead(WIND_SPEED_PIN);
-        return map(raw, 0, WIND_SPEED_MAX_RAW, 0, WIND_SPEED_MAX_MPS) * 0.1;
+        int raw = analogRead(config.windSpeedPin);
+        return map(raw, 0, config.windSpeedMaxRaw, 0, config.windSpeedMaxMps) * 0.1;
     }
 
     float getWindDirection() {
@@ -139,7 +160,20 @@ private:
     }
 };
 
-SensorManager sensorManager;
+// Configuration and setup
+Config config = {
+    .windSpeedPin = A0,
+    .sensorFailRedPin = 2,
+    .sensorOkGreenPin = 3,
+    .windSpeedMaxRaw = 1023,
+    .windSpeedMaxMps = 30,
+    .baudRate = 9600,
+    .blinkIntervalMs = 500,
+    .bme280Address = 0x76,
+    .magSensorId = 12345
+};
+
+SensorManager sensorManager(config);
 
 void setup() {
     sensorManager.setup();

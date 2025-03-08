@@ -40,9 +40,7 @@ public:
     rangeSerial.begin(SERIAL_BAUD_RATE);
     Wire.begin();
 
-    pinMode(PinConfig::TRIGGER_BUTTON_PIN, INPUT_PULLUP);
-    pinMode(PinConfig::RED_LED_PIN, OUTPUT);
-    pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
+    configurePins();
     setLEDs(LOW, LOW);
 
     if (!initializeSensors()) {
@@ -72,28 +70,35 @@ private:
     if (!sensorsOperational) return;
 
     DateTime requestTime = rtc.now();
-    loraSerial.println(String(DEVICE_ID) + "," + String(requestTime.unixtime()));
+    sendRequest(requestTime);
 
-    unsigned long start = millis();
-    bool success = false;
-    while (millis() - start < RESPONSE_TIMEOUT) {
-      if (loraSerial.available()) {
-        String response = loraSerial.readStringUntil('\n');
-        if (response.startsWith(RESPONSE_PREFIX)) {
-          success = processResponse(response);
-          break;
-        }
-      }
-    }
-
-    if (success) {
+    if (waitForResponse()) {
       flashLED(PinConfig::GREEN_LED_PIN, 1000);
     } else {
       flashLED(PinConfig::RED_LED_PIN, 1000);
     }
   }
 
-  bool processResponse(const String& response) {
+  static void sendRequest(const DateTime& requestTime) {
+    char buffer[64];
+    snprintf(buffer, sizeof(buffer), "%d,%ld", DEVICE_ID, requestTime.unixtime());
+    loraSerial.println(buffer);
+  }
+
+  static bool waitForResponse() {
+    unsigned long start = millis();
+    while (millis() - start < RESPONSE_TIMEOUT) {
+      if (loraSerial.available()) {
+        String response = loraSerial.readStringUntil('\n');
+        if (response.startsWith(RESPONSE_PREFIX)) {
+          return processResponse(response);
+        }
+      }
+    }
+    return false;
+  }
+
+  static bool processResponse(const String& response) {
     float b1Time = response.substring(strlen(RESPONSE_PREFIX)).toFloat();
     float dist_B1 = getDistanceFromB1(b1Time);
     float bearing_B1 = getBearing();
@@ -110,12 +115,12 @@ private:
     return true;
   }
 
-  float getDistanceFromB1(float b1Time) {
+  static float getDistanceFromB1(float b1Time) {
     float now = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
     return (now - b1Time) * SPEED_OF_LIGHT;
   }
 
-  float getBearing() {
+  static float getBearing() {
     sensors_event_t event;
     mag.getEvent(&event);
     float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
@@ -123,7 +128,7 @@ private:
     return heading;
   }
 
-  float getDistanceToTarget() {
+  static float getDistanceToTarget() {
     rangeSerial.println(RANGE_COMMAND);
     if (rangeSerial.available()) {
       return rangeSerial.readStringUntil('\n').toFloat();
@@ -131,12 +136,12 @@ private:
     return DEFAULT_DISTANCE;
   }
 
-  void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
+  static void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
     DateTime now = rtc.now();
-    String packet = String(DEVICE_ID) + "," + String(now.unixtime()) + "," + 
-                    String(dist_B1) + "," + String(bearing_B1) + "," + 
-                    String(bearing_target) + "," + String(dist_target);
-    loraSerial.println(packet);
+    char buffer[128];
+    snprintf(buffer, sizeof(buffer), "%d,%ld,%.2f,%.2f,%.2f,%.2f", DEVICE_ID, now.unixtime(),
+             dist_B1, bearing_B1, bearing_target, dist_target);
+    loraSerial.println(buffer);
   }
 
   void setLEDs(int redState, int greenState) {
@@ -162,7 +167,14 @@ private:
     sensorsOperational = false;
     setLEDs(HIGH, LOW);
     Serial.println("Sensor failure");
-    while (true);  // Consider adding a reset mechanism instead of an infinite loop
+    // Consider adding a reset mechanism instead of an infinite loop
+    while (true);  
+  }
+
+  void configurePins() {
+    pinMode(PinConfig::TRIGGER_BUTTON_PIN, INPUT_PULLUP);
+    pinMode(PinConfig::RED_LED_PIN, OUTPUT);
+    pinMode(PinConfig::GREEN_LED_PIN, OUTPUT);
   }
 };
 
