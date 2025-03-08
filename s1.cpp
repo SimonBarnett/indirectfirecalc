@@ -24,6 +24,8 @@ constexpr char RANGE_COMMAND[] = "RANGE";
 constexpr char RESPONSE_PREFIX[] = "B1";
 constexpr int LED_FLASH_DURATION_MS = 1000;
 constexpr int LED_BLINK_INTERVAL_MS = 50;
+constexpr int BUFFER_SIZE = 64;
+constexpr int DATA_BUFFER_SIZE = 128;
 
 // Components
 SoftwareSerial loraSerial(PinConfig::LORA_RX_PIN, PinConfig::LORA_TX_PIN); 
@@ -68,26 +70,28 @@ private:
     RTC_DS3231& rtc;
     bool sensorsOperational;
 
+    static SensorSystem* instance;
+
     static void onClick() {
-        if (!sensorsOperational) return;
+        if (!instance->sensorsOperational) return;
 
-        DateTime requestTime = rtc.now();
-        sendRequest(requestTime);
+        DateTime requestTime = instance->rtc.now();
+        instance->sendRequest(requestTime);
 
-        if (waitForResponse()) {
-            flashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
+        if (instance->waitForResponse()) {
+            instance->flashLED(PinConfig::GREEN_LED_PIN, LED_FLASH_DURATION_MS);
         } else {
-            flashLED(PinConfig::RED_LED_PIN, LED_FLASH_DURATION_MS);
+            instance->flashLED(PinConfig::RED_LED_PIN, LED_FLASH_DURATION_MS);
         }
     }
 
-    static void sendRequest(const DateTime& requestTime) {
-        char buffer[64];
+    void sendRequest(const DateTime& requestTime) {
+        char buffer[BUFFER_SIZE];
         snprintf(buffer, sizeof(buffer), "%d,%ld", DEVICE_ID, requestTime.unixtime());
         loraSerial.println(buffer);
     }
 
-    static bool waitForResponse() {
+    bool waitForResponse() {
         unsigned long start = millis();
         while (millis() - start < RESPONSE_TIMEOUT_MS) {
             if (loraSerial.available()) {
@@ -100,7 +104,7 @@ private:
         return false;
     }
 
-    static bool processResponse(const String& response) {
+    bool processResponse(const String& response) {
         float b1Time = response.substring(strlen(RESPONSE_PREFIX)).toFloat();
         float dist_B1 = getDistanceFromB1(b1Time);
         float bearing_B1 = getBearing();
@@ -117,12 +121,12 @@ private:
         return true;
     }
 
-    static float getDistanceFromB1(float b1Time) {
+    float getDistanceFromB1(float b1Time) {
         float now = rtc.now().unixtime() + (millis() % 1000) / 1000.0;
         return (now - b1Time) * SPEED_OF_LIGHT;
     }
 
-    static float getBearing() {
+    float getBearing() {
         sensors_event_t event;
         mag.getEvent(&event);
         float heading = atan2(event.magnetic.y, event.magnetic.x) * 180 / PI;
@@ -130,7 +134,7 @@ private:
         return heading;
     }
 
-    static float getDistanceToTarget() {
+    float getDistanceToTarget() {
         rangeSerial.println(RANGE_COMMAND);
         if (rangeSerial.available()) {
             return rangeSerial.readStringUntil('\n').toFloat();
@@ -138,9 +142,9 @@ private:
         return DEFAULT_DISTANCE;
     }
 
-    static void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
+    void sendData(float dist_B1, float bearing_B1, float bearing_target, float dist_target) {
         DateTime now = rtc.now();
-        char buffer[128];
+        char buffer[DATA_BUFFER_SIZE];
         snprintf(buffer, sizeof(buffer), "%d,%ld,%.2f,%.2f,%.2f,%.2f", DEVICE_ID, now.unixtime(),
                  dist_B1, bearing_B1, bearing_target, dist_target);
         loraSerial.println(buffer);
@@ -162,7 +166,15 @@ private:
     }
 
     bool initializeSensors() {
-        return mag.begin() && rtc.begin();
+        if (!mag.begin()) {
+            Serial.println("Magnetometer initialization failed!");
+            return false;
+        }
+        if (!rtc.begin()) {
+            Serial.println("RTC initialization failed!");
+            return false;
+        }
+        return true;
     }
 
     void handleSensorFailure() {
@@ -179,9 +191,12 @@ private:
     }
 };
 
+SensorSystem* SensorSystem::instance = nullptr;
+
 SensorSystem sensorSystem(loraSerial, rangeSerial, mag, rtc);
 
 void setup() {
+    SensorSystem::instance = &sensorSystem;
     sensorSystem.setup();
 }
 

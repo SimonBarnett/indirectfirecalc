@@ -1,4 +1,3 @@
-
 #include <Adafruit_SSD1306.h>
 #include <RTC_DS3231.h>
 #include <SoftwareSerial.h>
@@ -6,56 +5,49 @@
 #include <map>
 #include <Wire.h>
 
-// Namespace for configurations
 namespace Config {
-    // Constants
     constexpr float SPEED_OF_LIGHT = 3e8; // Speed of light (m/s)
     constexpr int MAX_MISSIONS = 10;
     constexpr int SCREEN_WIDTH = 128;
     constexpr int SCREEN_HEIGHT = 64;
     constexpr int BAUD_RATE = 9600;
     constexpr int DISPLAY_I2C_ADDRESS = 0x3C;
+    constexpr int DISPLAY_FAILURE_DELAY = 5000; // Delay in milliseconds
+    constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
 
-    // Pin Definitions
     enum PinConfig {
         UP_PIN = 3,
-        DOWN_PIN,
-        SWITCH_81MM_PIN,
-        SWITCH_155MM_PIN,
-        SWITCH_120MM_PIN,
-        RED_LED_PIN,
-        GREEN_LED_PIN,
-        LORA_RX_PIN,
-        LORA_TX_PIN
+        DOWN_PIN = 4,
+        SWITCH_81MM_PIN = 5,
+        SWITCH_155MM_PIN = 6,
+        SWITCH_120MM_PIN = 7,
+        RED_LED_PIN = 8,
+        GREEN_LED_PIN = 9,
+        LORA_RX_PIN = 10,
+        LORA_TX_PIN = 11
     };
-
-    // Additional Constants
-    constexpr int DEBOUNCE_DELAY = 200; // Debounce delay in milliseconds
-    constexpr int DISPLAY_LINES = 5; // Number of lines to display
 }
 
-// Weapon types
+constexpr float PI = 3.14159265358979323846;
+
 enum WeaponType {
     MORTAR_81MM, 
     ARTILLERY_155MM, 
     TANK_120MM 
 };
 
-// Data structure to store weapon properties
 struct WeaponProperties {
     float tof;
     std::vector<float> velocities;
     int maxCharges;
 };
 
-// Weapon properties map
 const std::map<WeaponType, WeaponProperties> weaponProperties = {
     {MORTAR_81MM, {10.0, {70, 120, 170, 210, 250}, 5}},
     {ARTILLERY_155MM, {20.0, {300, 450, 600, 750, 827}, 5}},
     {TANK_120MM, {1.0, {1700}, 1}}
 };
 
-// Helper function to split string
 std::vector<std::string> splitString(const std::string &str, char delimiter) {
     std::vector<std::string> tokens;
     std::stringstream ss(str);
@@ -66,7 +58,6 @@ std::vector<std::string> splitString(const std::string &str, char delimiter) {
     return tokens;
 }
 
-// Encapsulate display in a class
 class DisplayManager {
 private:
     Adafruit_SSD1306 display;
@@ -77,7 +68,7 @@ public:
     void setup() {
         if (!display.begin(SSD1306_SWITCHCAPVCC, Config::DISPLAY_I2C_ADDRESS)) {
             Serial.println("Display failure");
-            delay(5000); // Wait 5 seconds before attempting a reset
+            delay(Config::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
         } else {
             initializeDisplay();
         }
@@ -113,14 +104,16 @@ public:
     }
 };
 
-// Create instance
 DisplayManager displayManager(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, &Wire, -1);
 
-// RTC and Serial setup
 RTC_DS3231 rtc;
 SoftwareSerial loraSerial(Config::LORA_RX_PIN, Config::LORA_TX_PIN);
 
-// Data Structures
+void setLEDState(bool redState, bool greenState) {
+    digitalWrite(Config::RED_LED_PIN, redState ? HIGH : LOW);
+    digitalWrite(Config::GREEN_LED_PIN, greenState ? HIGH : LOW);
+}
+
 struct TargetData {
     int id;
     float dist_B1;
@@ -137,11 +130,10 @@ struct FireMission {
     float elevation; // mils
 };
 
-// Class to encapsulate mission data
 class MissionManager {
 public:
-    TargetData targets[Config::MAX_MISSIONS];
-    FireMission missions[Config::MAX_MISSIONS];
+    std::array<TargetData, Config::MAX_MISSIONS> targets{};
+    std::array<FireMission, Config::MAX_MISSIONS> missions{};
     int missionCount = 0;
     int displayStart = 0;
     float wind_speed = 0, wind_dir = 0, pressure = 0, temp = 0, humidity = 0;
@@ -156,32 +148,6 @@ public:
 
 MissionManager manager;
 
-// Function Prototypes
-void setupPins();
-void setupDisplay();
-void setupRTC();
-void readEnvData();
-void readLoRaData();
-void handleWeaponTypeChange();
-void handleDisplayNavigation();
-
-void setup() {
-    Serial.begin(Config::BAUD_RATE); // USB to W1
-    loraSerial.begin(Config::BAUD_RATE);
-    Wire.begin();
-    
-    setupPins();
-    displayManager.setup();
-    setupRTC();
-}
-
-void loop() {
-    readEnvData();
-    readLoRaData();
-    handleWeaponTypeChange();
-    handleDisplayNavigation();
-}
-
 void setupPins() {
     pinMode(Config::UP_PIN, INPUT_PULLUP);
     pinMode(Config::DOWN_PIN, INPUT_PULLUP);
@@ -190,14 +156,13 @@ void setupPins() {
     pinMode(Config::SWITCH_120MM_PIN, INPUT_PULLUP);
     pinMode(Config::RED_LED_PIN, OUTPUT);
     pinMode(Config::GREEN_LED_PIN, OUTPUT);
-    digitalWrite(Config::RED_LED_PIN, HIGH); // Red on until W1 connects
-    digitalWrite(Config::GREEN_LED_PIN, LOW);
+    setLEDState(true, false); // Red on until W1 connects
 }
 
 void setupRTC() {
     if (!rtc.begin()) {
         Serial.println("RTC failure");
-        delay(5000); // Wait 5 seconds before attempting a reset
+        delay(Config::DISPLAY_FAILURE_DELAY); // Wait 5 seconds before attempting a reset
     } else {
         rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
     }
@@ -214,13 +179,11 @@ void readEnvData() {
             manager.temp = std::stof(tokens[3]);
             manager.humidity = std::stof(tokens[4]);
             manager.envDataValid = true;
-            digitalWrite(Config::RED_LED_PIN, LOW);   // Green on when W1 connected
-            digitalWrite(Config::GREEN_LED_PIN, HIGH);
+            setLEDState(false, true);   // Green on when W1 connected
             manager.recalculateAllMissions();
         }
     } else if (!manager.envDataValid) {
-        digitalWrite(Config::RED_LED_PIN, HIGH);  // Red on if no W1 data
-        digitalWrite(Config::GREEN_LED_PIN, LOW);
+        setLEDState(true, false);  // Red on if no W1 data
     }
 }
 
@@ -240,14 +203,12 @@ void readLoRaData() {
                 target.bearing_B1 = std::stof(tokens[3]);
                 target.bearing_target = std::stof(tokens[4]);
                 target.dist_target = std::stof(tokens[5]);
-                
+
                 if (manager.missionCount < Config::MAX_MISSIONS) {
                     manager.targets[manager.missionCount] = target;
                     manager.missionCount++;
                 } else {
-                    for (int i = 1; i < Config::MAX_MISSIONS; i++) {
-                        manager.targets[i - 1] = manager.targets[i];
-                    }
+                    std::copy(manager.targets.begin() + 1, manager.targets.end(), manager.targets.begin());
                     manager.targets[Config::MAX_MISSIONS - 1] = target;
                 }
                 manager.recalculateAllMissions();
@@ -294,21 +255,21 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
     float rad_t = target.bearing_target * PI / 180;
     float x_t = x_s + target.dist_target * sin(rad_t);
     float y_t = y_s + target.dist_target * cos(rad_t);
-    
+
     float temp_k = temp + 273.15;
     float pv = (humidity / 100.0) * 6.1078 * pow(10, (7.5 * temp) / (237.3 + temp));
     float pd = pressure - pv;
     float density = (pd * 100 / (287 * temp_k)) + (pv * 100 / (461.5 * temp_k));
     float density_factor = 1.225 / density;
-    
+
     float wind_rad = wind_dir * PI / 180;
     float wind_x = wind_speed * cos(wind_rad);
     float wind_y = wind_speed * sin(wind_rad);
-    
+
     const WeaponProperties& properties = weaponProperties.at(weapon);
     x_t += wind_x * properties.tof;
     y_t += wind_y * properties.tof;
-    
+
     mission.range = sqrt(x_t * x_t + y_t * y_t) * sqrt(density_factor);
     mission.azimuth = atan2(x_t, y_t) * (6400 / (2 * PI));
     if (mission.azimuth < 0) mission.azimuth += 6400;
@@ -324,7 +285,7 @@ void MissionManager::computeTarget(const TargetData& target, FireMission& missio
         if (i == properties.maxCharges - 1) mission.charge = i;
     }
     float v_chosen = properties.velocities[mission.charge];
-    
+
     if (weapon == TANK_120MM) {
         mission.elevation = atan2(mission.range, target.dist_target) * (6400 / (2 * PI));
     } else {
@@ -353,4 +314,21 @@ WeaponType MissionManager::getWeaponType() {
     if (digitalRead(Config::SWITCH_155MM_PIN) == LOW) return ARTILLERY_155MM;
     if (digitalRead(Config::SWITCH_120MM_PIN) == LOW) return TANK_120MM;
     return MORTAR_81MM; // Default
+}
+
+void setup() {
+    Serial.begin(Config::BAUD_RATE); // USB to W1
+    loraSerial.begin(Config::BAUD_RATE);
+    Wire.begin();
+    
+    setupPins();
+    displayManager.setup();
+    setupRTC();
+}
+
+void loop() {
+    readEnvData();
+    readLoRaData();
+    handleWeaponTypeChange();
+    handleDisplayNavigation();
 }

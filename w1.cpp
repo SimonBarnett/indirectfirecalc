@@ -4,29 +4,20 @@
 
 // Configuration parameters
 struct Config {
-    int windSpeedPin;
-    int sensorFailRedPin;
-    int sensorOkGreenPin;
-    int windSpeedMaxRaw;
-    int windSpeedMaxMps;
-    long baudRate;
-    int blinkIntervalMs;
-    uint8_t bme280Address;
-    int magSensorId;
+    int windSpeedPin = A0;
+    int sensorFailRedPin = 2;
+    int sensorOkGreenPin = 3;
+    int windSpeedMaxRaw = 1023;
+    int windSpeedMaxMps = 30;
+    long baudRate = 9600;
+    int blinkIntervalMs = 500;
+    uint8_t bme280Address = 0x76;
+    int magSensorId = 12345;
 };
 
 // Constants
 constexpr int INIT_DELAY_MS = 500;
 constexpr int UPDATE_INTERVAL_MS = 1000;
-constexpr int WIND_SPEED_PIN = A0;
-constexpr int SENSOR_FAIL_RED_PIN = 2;
-constexpr int SENSOR_OK_GREEN_PIN = 3;
-constexpr int WIND_SPEED_MAX_RAW = 1023;
-constexpr int WIND_SPEED_MAX_MPS = 30;
-constexpr long BAUD_RATE = 9600;
-constexpr int BLINK_INTERVAL_MS = 500;
-constexpr uint8_t BME280_ADDRESS = 0x76;
-constexpr int MAG_SENSOR_ID = 12345;
 
 // Logger class
 class Logger {
@@ -95,7 +86,7 @@ public:
 
     void loop() {
         unsigned long currentMillis = millis();
-        if (currentMillis - lastUpdate >= UPDATE_INTERVAL_MS) {
+        if (shouldUpdate(currentMillis)) {
             lastUpdate = currentMillis;
             updateSensorReadings();
         }
@@ -132,7 +123,7 @@ private:
                 ledManager.setRedLEDState(!digitalRead(config.sensorFailRedPin));
                 lastBlinkTime = currentMillis;
             }
-            delay(10); 
+            delay(10); // Replace this with a non-blocking approach
         }
     }
 
@@ -151,10 +142,10 @@ private:
         float temp = bme.readTemperature();
         float humidity = bme.readHumidity();
 
-        if (isnan(speed) || isnan(dir) || isnan(pressure) || isnan(temp) || isnan(humidity)) {
-            ledManager.setRedLEDState(true);
-        } else {
-            ledManager.setRedLEDState(false);
+        bool isError = isnan(speed) || isnan(dir) || isnan(pressure) || isnan(temp) || isnan(humidity);
+        ledManager.setRedLEDState(isError);
+
+        if (!isError) {
             Logger::logSensorData(speed, dir, pressure, temp, humidity);
         }
     }
@@ -171,20 +162,14 @@ private:
         if (heading < 0) heading += 360;
         return heading;
     }
+
+    bool shouldUpdate(unsigned long currentMillis) {
+        return (currentMillis - lastUpdate) >= UPDATE_INTERVAL_MS;
+    }
 };
 
 // Configuration and setup
-Config config = {
-    .windSpeedPin = WIND_SPEED_PIN,
-    .sensorFailRedPin = SENSOR_FAIL_RED_PIN,
-    .sensorOkGreenPin = SENSOR_OK_GREEN_PIN,
-    .windSpeedMaxRaw = WIND_SPEED_MAX_RAW,
-    .windSpeedMaxMps = WIND_SPEED_MAX_MPS,
-    .baudRate = BAUD_RATE,
-    .blinkIntervalMs = BLINK_INTERVAL_MS,
-    .bme280Address = BME280_ADDRESS,
-    .magSensorId = MAG_SENSOR_ID
-};
+Config config;
 
 SensorManager sensorManager(config);
 
