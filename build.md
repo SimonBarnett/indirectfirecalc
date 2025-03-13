@@ -33,3 +33,38 @@
 | RST             | Navigation buttons' reset pins                               | (Same as left)                                               | RST              |
 | GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, etc.)| Free                                                         | RX (D0)          |
 | VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
+
+| Module Name      | Module Pin | Nano Pin |
+|------------------|------------|----------|
+| GPS Module       | VCC        | 5V       |
+| GPS Module       | GND        | GND      |
+| GPS Module       | TX         | D2       |
+| GPS Module       | RX         | D3       |
+| LORA Module      | VCC        | 5V       |
+| LORA Module      | GND        | GND      |
+| LORA Module      | TX         | D10      |
+| LORA Module      | RX         | D11      |
+| Lidar Module     | VCC        | 5V       |
+| Lidar Module     | GND        | GND      |
+| Lidar Module     | TX         | D4       |
+| Lidar Module     | RX         | D5       |
+| OLED Module      | VCC        | 5V       |
+| OLED Module      | GND        | GND      |
+| OLED Module      | SDA        | A4       |
+| OLED Module      | SCL        | A5       |
+| PCF8574          | VCC        | 5V       |
+| PCF8574          | GND        | GND      |
+| PCF8574          | SDA        | A4       |
+| PCF8574          | SCL        | A5       |
+| Magnetic Sensor  | VCC        | 5V       |
+| Magnetic Sensor  | GND        | GND      |
+| Magnetic Sensor  | SDA        | A4       |
+| Magnetic Sensor  | SCL        | A5       |
+| BME280           | VCC        | 5V       |
+| BME280           | GND        | GND      |
+| BME280           | SDA        | A4       |
+| BME280           | SCL        | A5       |
+| RTC Module       | VCC        | 5V       |
+| RTC Module       | GND        | GND      |
+| RTC Module       | SDA        | A4       |
+| RTC Module       | SCL        | A5       |
