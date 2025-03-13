@@ -15,3 +15,21 @@
 | **Modules - Bulb**   | UMTMedia® 30pcs 220 ohm O - 1/4W Watt Metal Film Resistors 0.25 ±1%                                   | 30           | N/A (Used in series with LED anodes as above)                                                                                            |
 | **Modules**          | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus, each with unique address set via jumpers)                   |
 | **Modules**          | AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module (Pack of 3)          | 3            | Shield 5V Out → Nano 5V, Shield 3.3V Out → Nano 3.3V, Shield GND → Nano GND (Power output to Nano)                                        |
+
+| Nano Pin (Left) | Connected To (Left)                                          | Connected To (Right)                                         | Nano Pin (Right) |
+|-----------------|--------------------------------------------------------------|--------------------------------------------------------------|------------------|
+| D13             | Free                                                         | Free                                                         | D12              |
+| 3.3V            | Battery shield 3.3V out                                      | LORA module RX pin                                           | D11              |
+| REF             | Free                                                         | LORA module TX pin                                           | D10              |
+| A0              | Push button 1                                                | LED green anode (via 220Ω resistor)                          | D9               |
+| A1              | Push button 2                                                | LED red anode (via 220Ω resistor)                            | D8               |
+| A2              | Push button 3                                                | LED green anode (via 220Ω resistor)                          | D7               |
+| A3              | Push button 4                                                | LED red anode (via 220Ω resistor)                            | D6               |
+| A4              | I2C SDA: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module RX pin                                          | D5               |
+| A5              | I2C SCL: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module TX pin                                          | D4               |
+| A6              | Free                                                         | GPS module RX pin                                            | D3               |
+| A7              | Free                                                         | GPS module TX pin                                            | D2               |
+| 5V              | Multiple modules' VCC (GPS, LORA, Lidar, OLED, PCF8574, etc.)| Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, etc.)| GND              |
+| RST             | Navigation buttons' reset pins                               | (Same as left)                                               | RST              |
+| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, etc.)| Free                                                         | RX (D0)          |
+| VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
