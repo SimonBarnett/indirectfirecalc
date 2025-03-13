@@ -40,7 +40,7 @@
 
 # Module Connections to Arduino Nano
 
-Below are the connections for each module to the Arduino Nano, organized by module.
+Below are the connections for each module to the Arduino Nano, organized by module. Each table lists the module's pins and the corresponding Arduino Nano pins they connect to.
 
 ## GPS Module
 
@@ -118,6 +118,17 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | SCL        | A5       |
 
 **Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+
+## PCF8574 (x5)
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+**Note:** There are 5 PCF8574 modules, each configured with a unique I2C address set via jumpers. They share the I2C bus on Nano pins A4 (SDA) and A5 (SCL).
 
 ## HALJIA 5Pcs Five Direction Navigation Button Module (x5, each via separate PCF8574)
 
