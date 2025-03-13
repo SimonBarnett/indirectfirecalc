@@ -1,3 +1,5 @@
+# Arduino Modules 
+
 | **Category**         | **Part Description**                                                                                   | **Quantity** | **Connections (Nano Pin → Module Pin)**                                                                                                   |
 |----------------------|--------------------------------------------------------------------------------------------------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|
 | **Nano**             | DUBEUYEW 3pcs Nano Soldered Module, Nano Board CH340 Chip, 5V 16MHz for Arduino with Cable and Adapter | 3            | N/A (Base Nano board)                                                                                                                    |
@@ -15,6 +17,8 @@
 | **Modules - Bulb**   | UMTMedia® 30pcs 220 ohm O - 1/4W Watt Metal Film Resistors 0.25 ±1%                                   | 30           | N/A (Used in series with LED anodes as above)                                                                                            |
 | **Modules**          | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus, each with unique address set via jumpers)                   |
 | **Modules**          | AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module (Pack of 3)          | 3            | Shield 5V Out → Nano 5V, Shield 3.3V Out → Nano 3.3V, Shield GND → Nano GND (Power output to Nano)                                        |
+
+# Arduino Nano to Module Connections 
 
 | Nano Pin (Left) | Connected To (Left)                                          | Connected To (Right)                                         | Nano Pin (Right) |
 |-----------------|--------------------------------------------------------------|--------------------------------------------------------------|------------------|
@@ -34,37 +38,80 @@
 | GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, etc.)| Free                                                         | RX (D0)          |
 | VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
 
-| Module Name      | Module Pin | Nano Pin |
-|------------------|------------|----------|
-| GPS Module       | VCC        | 5V       |
-| GPS Module       | GND        | GND      |
-| GPS Module       | TX         | D2       |
-| GPS Module       | RX         | D3       |
-| LORA Module      | VCC        | 5V       |
-| LORA Module      | GND        | GND      |
-| LORA Module      | TX         | D10      |
-| LORA Module      | RX         | D11      |
-| Lidar Module     | VCC        | 5V       |
-| Lidar Module     | GND        | GND      |
-| Lidar Module     | TX         | D4       |
-| Lidar Module     | RX         | D5       |
-| OLED Module      | VCC        | 5V       |
-| OLED Module      | GND        | GND      |
-| OLED Module      | SDA        | A4       |
-| OLED Module      | SCL        | A5       |
-| PCF8574          | VCC        | 5V       |
-| PCF8574          | GND        | GND      |
-| PCF8574          | SDA        | A4       |
-| PCF8574          | SCL        | A5       |
-| Magnetic Sensor  | VCC        | 5V       |
-| Magnetic Sensor  | GND        | GND      |
-| Magnetic Sensor  | SDA        | A4       |
-| Magnetic Sensor  | SCL        | A5       |
-| BME280           | VCC        | 5V       |
-| BME280           | GND        | GND      |
-| BME280           | SDA        | A4       |
-| BME280           | SCL        | A5       |
-| RTC Module       | VCC        | 5V       |
-| RTC Module       | GND        | GND      |
-| RTC Module       | SDA        | A4       |
-| RTC Module       | SCL        | A5       |
+# Module Connections to Arduino Nano
+
+Below are the connections for each module to the Arduino Nano, organized by module.
+
+## GPS Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| TX         | D2       |
+| RX         | D3       |
+
+## LORA Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| TX         | D10      |
+| RX         | D11      |
+
+## Lidar Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| TX         | D4       |
+| RX         | D5       |
+
+## OLED Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+## PCF8574
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+## Magnetic Sensor
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+## BME280
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+## RTC Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| VCC        | 5V       |
+| GND        | GND      |
+| SDA        | A4       |
+| SCL        | A5       |
+
+**Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
