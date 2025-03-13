@@ -51,6 +51,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | TX         | D2       |
 | RX         | D3       |
 
+**Note:** Uses SoftwareSerial on pins D2 (RX) and D3 (TX).
+
 ## LORA Module
 
 | Module Pin | Nano Pin |
@@ -59,6 +61,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | GND        | GND      |
 | TX         | D10      |
 | RX         | D11      |
+
+**Note:** Uses SoftwareSerial on pins D10 (RX) and D11 (TX).
 
 ## Lidar Module
 
@@ -69,6 +73,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | TX         | D4       |
 | RX         | D5       |
 
+**Note:** Uses SoftwareSerial on pins D4 (RX) and D5 (TX).
+
 ## OLED Module
 
 | Module Pin | Nano Pin |
@@ -78,14 +84,7 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | SDA        | A4       |
 | SCL        | A5       |
 
-## PCF8574
-
-| Module Pin | Nano Pin |
-|------------|----------|
-| VCC        | 5V       |
-| GND        | GND      |
-| SDA        | A4       |
-| SCL        | A5       |
+**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
 
 ## Magnetic Sensor
 
@@ -96,6 +95,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | SDA        | A4       |
 | SCL        | A5       |
 
+**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+
 ## BME280
 
 | Module Pin | Nano Pin |
@@ -104,6 +105,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | GND        | GND      |
 | SDA        | A4       |
 | SCL        | A5       |
+
+**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
 
 ## RTC Module
 
@@ -114,4 +117,33 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
+**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+
+## HALJIA 5Pcs Five Direction Navigation Button Module (x5, each via separate PCF8574)
+
+| Module Pin | Connection                 |
+|------------|----------------------------|
+| com        | GND                        |
+| up         | PCF8574 P0 (I2C on A4, A5) |
+| down       | PCF8574 P1 (I2C on A4, A5) |
+| left       | PCF8574 P2 (I2C on A4, A5) |
+| right      | PCF8574 P3 (I2C on A4, A5) |
+| mid        | PCF8574 P4 (I2C on A4, A5) |
+| set        | PCF8574 P5 (I2C on A4, A5) |
+| reset      | Nano RST                   |
+
+**Note:** Each of the 5 navigation modules is connected to its own PCF8574 expander, with unique I2C addresses set via jumpers. The PCF8574 expanders are connected to the Arduino Nano via the I2C bus (A4 → SDA, A5 → SCL).
+
+## Universal 4 Key Push Button Switch Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| GND        | GND      |
+| K1         | A0       |
+| K2         | A1       |
+| K3         | A2       |
+| K4         | A3       |
+
+**Note:** The key pins (K1 to K4) are connected to the Arduino Nano's analog pins A0 to A3, which are used as digital inputs with internal pull-up resistors.
+
+**General Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
