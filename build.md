@@ -157,4 +157,30 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 
 **Note:** The key pins (K1 to K4) are connected to the Arduino Nano's analog pins A0 to A3, which are used as digital inputs with internal pull-up resistors.
 
+## AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module
+
+| Module Pin | Nano Pin |
+|------------|----------|
+| 5V Out     | 5V       |
+| 3V Out     | 3.3V     |
+| GND        | GND      |
+| Micro USB  | VIN      |
+
+**Note:** This module provides power to the Nano. The **5V Out** connects to the Nano’s 5V pin to supply power, **3V Out** connects to the 3.3V pin if needed, and **GND** connects to any Nano GND pin. The **Micro USB** port accepts external 5V input (e.g., from a charger) and connects to VIN for powering the Nano when not using the battery. The module includes a battery slot for an 18650 cell, with internal charging and protection circuits.
+
+**General Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
+
+---
+
+### Explanation of AZDelivery 18650 Module Pinout
+The **AZDelivery 18650 Lithium Li-ion Battery Expansion Shield** is a power supply module with the following key features:
+- **5V Out**: Outputs 5V from the 18650 battery (via a boost converter), connected to the Nano’s 5V pin to power the board and modules.
+- **3V Out**: Outputs 3V (or 3.3V depending on the model), connected to the Nano’s 3.3V pin if additional 3.3V power is needed (optional, as the Nano has its own 3.3V regulator).
+- **GND**: Ground connection, linked to any Nano GND pin.
+- **Micro USB**: Input for charging the 18650 battery or powering the Nano directly when no battery is present; connects to VIN to supply power to the Nano.
+
+This module does not require data pins (like I2C or serial) as it’s a power source, not a communication device. The pinout reflects its role in supplying power to the Nano, integrating seamlessly with the existing setup. You can copy this entire Markdown block into your `.md` file for documentation.
+
+**Note:** The key pins (K1 to K4) are connected to the Arduino Nano's analog pins A0 to A3, which are used as digital inputs with internal pull-up resistors.
+
 **General Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
