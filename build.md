@@ -24,11 +24,11 @@
 
 | Nano Pin (Left) | Connected To (Left)                                          | Connected To (Right)                                         | Nano Pin (Right) |
 |-----------------|--------------------------------------------------------------|--------------------------------------------------------------|------------------|
-| D13             | Free                                                         | Free                                                         | D12              |
+| D13             | Bipolar LED 2 - pin2                                         | Bipolar LED 2 - pin1 (via 220Ω resistor)                     | D12              |
 | 3.3V            | Battery shield 3.3V out                                      | LORA module RX pin                                           | D11              |
 | REF             | Free                                                         | LORA module TX pin                                           | D10              |
-| A0              | Free                                                         | Push Button 4 (Key4)                                         | D9               |
-| A1              | Free                                                         | Push Button 3 (Key3)                                         | D8               |
+| A0              | Bipolar LED 1 - pin1 (via 220Ω resistor)                     | Push Button 4 (Key4)                                         | D9               |
+| A1              | Bipolar LED 1 - pin2                                         | Push Button 3 (Key3)                                         | D8               |
 | A2              | ALAMSCN IR Receiver DAT                                      | Push Button 2 (Key2)                                         | D7               |
 | A3              | ALAMSCN IR Transmitter DAT                                   | Push Button 1 (Key1)                                         | D6               |
 | A4              | I2C SDA: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module RX pin                                          | D5               |
