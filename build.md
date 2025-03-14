@@ -5,13 +5,13 @@
 | **Nano**             | DUBEUYEW 3pcs Nano Soldered Module, Nano Board CH340 Chip, 5V 16MHz for Arduino with Cable and Adapter | 3            | N/A (Base Nano board)                                                                                                                    |
 | **Modules - Coms**   | Acfthepiey -NEO6MV2 New NEO-6M GPS Module NEO6MV2 with Flight Control EEPROM APM2.5 Antenna           | 1            | Nano D2 → GPS TX, Nano D3 → GPS RX, Nano GND → GND, Nano 5V → VCC (SoftwareSerial on D2/D3)                                              |
 | **Modules - Coms**   | 2pc LORA Wireless Module 22dBm 433~475MHz 8KM LR01-SMD Low Power Wireless Transceiver UART             | 2            | Nano D10 → LORA TX, Nano D11 → LORA RX, Nano GND → GND, Nano 5V → VCC (SoftwareSerial on D10/D11)                                        |
-| **Modules - Coms**   | ALAMSCN Digital 38KHz Infrared IR Receiver Sensor Module with Transmitter Module Kit Set              | 5            | Receiver: Nano D12 → DAT, Nano GND → GND, Nano 5V → VCC; Transmitter: Nano D13 → DAT, Nano GND → GND, Nano 5V → VCC                    |
+| **Modules - Coms**   | ALAMSCN Digital 38KHz Infrared IR Receiver Sensor Module with Transmitter Module Kit Set              | 5            | Receiver: Nano D12 → DAT, Nano GND → GND, Nano 5V → VCC; Transmitter: Nano A3 → DAT, Nano GND → GND, Nano 5V → VCC                    |
 | **Modules - Sensors**| DAOKAI Three-axis magnetic sensor GY-273 QMC5883L HMC5883L Triple Axis Compass Magnetometer (Pack of 3) | 3            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - Sensors**| Diymore 2PCS GY-BME280 High Precision Digital Sensor Breakout Barometric Pressure Temperature Humidity | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - Sensors**| Qyrugcxs Tf-Luna Lidar Range Sensor Module 8M Range Low Power Tof Range Principle                     | 1            | Nano D4 → Lidar TX, Nano D5 → Lidar RX, Nano GND → GND, Nano 5V → VCC (SoftwareSerial on D4/D5)                                          |
 | **Modules - Sensors**| DollaTek 5Pcs Tiny RTC I2C DS1307 AT24C32 Real Time Clock Module For Arduino AVR PIC 51 ARM            | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - UI**     | HALJIA 5Pcs Five Direction Navigation Button Module DIY Electronic PCB Board                          | 5            | Connected to a PCF8574 expander: com → GND, up → P0, down → P1, left → P2, right → P3, mid → P4, set → P5, reset → Nano RST; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
-| **Modules - UI**     | Universal 4 Key Push Button Switch Module 4 Channel Keyboard Board Compatible by Garosa                | 1            | Nano A0 → Key1, Nano A1 → Key2, Nano A2 → Key3, Nano A3 → Key4, Nano GND → GND, Nano 5V → VCC                                           |
+| **Modules - UI**     | Universal 4 Key Push Button Switch Module 4 Channel Keyboard Board Compatible by Garosa                | 1            | Connected to a PCF8574 expander: Key1 → P0, Key2 → P1, Key3 → P2, Key4 → P3, GND → GND, VCC → 5V; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
 | **Modules - UI**     | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - UI**     | Fasizi 2Pcs 0.96" I2C IIC SPI Serial 128x64 OLED Display Module Board with Pin Headers                | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Pack of 10)                         | 10           | Nano D6 → 220Ω Resistor → Red Anode, Nano D7 → 220Ω Resistor → Green Anode, Nano GND → Common Cathode                                   |
@@ -27,17 +27,17 @@
 | D13             | LED Red Anode (via 220Ω resistor)                            | ALAMSCN IR Receiver DAT                                      | D12              |
 | 3.3V            | Battery shield 3.3V out                                      | LORA module RX pin                                           | D11              |
 | REF             | Free                                                         | LORA module TX pin                                           | D10              |
-| A0              | Push button 1 (Universal 4 Key)                              | LED green anode (via 220Ω resistor)                          | D9               |
-| A1              | Push button 2 (Universal 4 Key)                              | LED red anode (via 220Ω resistor)                            | D8               |
-| A2              | Push button 3 (Universal 4 Key)                              | LED green anode (via 220Ω resistor)                          | D7               |
-| A3              | Push button 4 (Universal 4 Key)                              | LED red anode (via 220Ω resistor)                            | D6               |
+| A0              | Free                                                         | LED green anode (via 220Ω resistor)                          | D9               |
+| A1              | Free                                                         | LED red anode (via 220Ω resistor)                            | D8               |
+| A2              | Free                                                         | LED green anode (via 220Ω resistor)                          | D7               |
+| A3              | ALAMSCN IR Transmitter DAT                                   | LED red anode (via 220Ω resistor)                            | D6               |
 | A4              | I2C SDA: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module RX pin                                          | D5               |
 | A5              | I2C SCL: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module TX pin                                          | D4               |
 | A6              | Free                                                         | GPS module RX pin                                            | D3               |
 | A7              | Free                                                         | GPS module TX pin                                            | D2               |
 | 5V              | Multiple modules' VCC (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | GND              |
 | RST             | Navigation buttons' reset pin                                | (Same as left)                                               | RST              |
-| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | ALAMSCN IR Transmitter DAT                                   | RX (D0)          |
+| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Free                                                         | RX (D0)          |
 | VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
 
 # Module Connections to Arduino Nano
@@ -77,9 +77,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | Receiver DAT     | D12      |
 | Transmitter VCC  | 5V       |
 | Transmitter GND  | GND      |
-| Transmitter DAT  | D0 (RX)  |
+| Transmitter DAT  | A3       |
 
-**Note:** One pair of the ALAMSCN IR receiver and transmitter mapped here. The receiver’s **DAT** pin connects to Nano D12, and the transmitter’s **DAT** pin connects to Nano D0 (RX). Ensure serial communication (e.g., uploading code) is not in use when the transmitter is active to avoid interference.
+**Note:** One pair of the ALAMSCN IR receiver and transmitter mapped here. The receiver’s **DAT** pin connects to Nano D12 (input), and the transmitter’s **DAT** pin connects to Nano A3 (output).
 
 ### Modules - Sensors
 
@@ -146,15 +146,16 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 #### Universal 4 Key Push Button Switch Module
 
-| Module Pin | Nano Pin |
-|------------|----------|
-| GND        | GND      |
-| K1         | A0       |
-| K2         | A1       |
-| K3         | A2       |
-| K4         | A3       |
+| Module Pin | Connection                 |
+|------------|----------------------------|
+| GND        | GND                        |
+| VCC        | 5V                         |
+| Key1       | PCF8574 P0 (I2C on A4, A5) |
+| Key2       | PCF8574 P1 (I2C on A4, A5) |
+| Key3       | PCF8574 P2 (I2C on A4, A5) |
+| Key4       | PCF8574 P3 (I2C on A4, A5) |
 
-**Note:** The key pins (K1 to K4) are connected to the Arduino Nano's analog pins A0 to A3, used as digital inputs with internal pull-up resistors.
+**Note:** Connected to a separate PCF8574 expander with a unique I2C address, freeing up Nano pins A0–A3.
 
 #### PCF8574
 
@@ -165,7 +166,7 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** One PCF8574 module mapped here, connected to the I2C bus on Nano pins A4 (SDA) and A5 (SCL).
+**Note:** One PCF8574 module mapped here, connected to the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Multiple PCF8574s are used (e.g., for navigation buttons and 4-key module), each with a unique I2C address.
 
 #### OLED Module
 
@@ -233,8 +234,18 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 ---
 
 ### General Notes
-- **I2C Bus:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
-- **ALAMSCN IR Module:** Now uses digital pins D12 (receiver) and D0 (RX) (transmitter) and does not share the I2C bus. Be cautious when using D0 (RX) as it’s also the Nano’s serial RX pin—disconnect the transmitter during serial operations like code uploads.
-- **D13 Usage:** The new LED on D13 mirrors the onboard LED. The 220Ω resistor limits current to ~13mA, keeping the total draw (onboard + external LED) within safe limits (~20mA).
+
+- **I2C Bus:** Multiple modules (OLED, PCF8574 for navigation buttons, PCF8574 for 4-key module, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins **A4 (SDA)** and **A5 (SCL)**. Ensure each PCF8574 has a unique I2C address (configurable via address pins A0–A2 on the PCF8574 board) to avoid conflicts.
+- **ALAMSCN IR Module Updates:**
+  - **Receiver:** Remains on **D12** as a digital input.
+  - **Transmitter:** Moved to **A3**, configured as a digital output, freeing **D0 (RX)**.
+- **Universal 4 Key Module Update:** Previously on **A0–A3**, now connected to a **PCF8574 expander** using pins **P0–P3**. This frees **A0–A3** for other uses (currently marked as free).
+- **Pin Availability:**
+  - **D0 (RX)** and **D1 (TX)** are now free, as requested.
+  - **A0–A2** are free and can be used as digital I/O or analog inputs if needed.
+  - **A6–A7** remain free but are analog input-only pins (can be used as digital inputs, not outputs).
+- **D13 Usage:** Connected to an LED mirroring the Nano’s onboard LED, with a 220Ω resistor limiting current to ~13mA, keeping the total draw (onboard + external LED) within safe limits (~20mA).
 
 ---
+
+This updated document reflects the new pin assignments while maintaining functionality and adhering to the requirement to keep **D0** and **D1** free. Copy this directly into your `.md` file as needed! Let me know if you need further adjustments.
