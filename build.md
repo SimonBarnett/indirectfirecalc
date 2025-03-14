@@ -41,7 +41,7 @@
 
 # Module Connections to Arduino Nano
 
-Below are the connections for each module to the Arduino Nano, organized by module. Each table lists the module's pins and the corresponding Arduino Nano pins they connect to.
+Below are the detailed connections for each module to the Arduino Nano, organized by module. Each table lists the module's pins and the corresponding Arduino Nano pins they connect to.
 
 ## GPS Module
 
@@ -131,7 +131,7 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 
 **Note:** There are 5 PCF8574 modules, each configured with a unique I2C address set via jumpers. They share the I2C bus on Nano pins A4 (SDA) and A5 (SCL).
 
-## HALJIA 5Pcs Five Direction Navigation Button Module
+## HALJIA 5Pcs Five Direction Navigation Button Module (x5)
 
 | Module Pin | Connection                 |
 |------------|----------------------------|
@@ -144,7 +144,7 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 | set        | PCF8574 P5 (I2C on A4, A5) |
 | reset      | Nano RST                   |
 
-**Note:** The navigation module is connected to its own PCF8574 expander, with unique I2C addresses set via jumpers. The PCF8574 expander is connected to the Arduino Nano via the I2C bus (A4 → SDA, A5 → SCL).
+**Note:** Each of the 5 navigation modules is connected to its own PCF8574 expander, with unique I2C addresses set via jumpers. The PCF8574 expanders are connected to the Arduino Nano via the I2C bus (A4 → SDA, A5 → SCL).
 
 ## Universal 4 Key Push Button Switch Module
 
@@ -169,7 +169,8 @@ Below are the connections for each module to the Arduino Nano, organized by modu
 
 **Note:** This module provides power to the Nano. The **5V Out** connects to the Nano’s 5V pin to supply power, **3V Out** connects to the 3.3V pin if needed, and **GND** connects to any Nano GND pin. The **Micro USB** port accepts external 5V input and connects to VIN for powering the Nano when not using the battery.
 
-## ALAMSCN Digital 38KHz Infrared IR Receiver Sensor Module with Transmitter Module Kit Set 
+## ALAMSCN Digital 38KHz Infrared IR Receiver Sensor Module with Transmitter Module Kit Set (x5)
+
 | Module Pin       | Nano Pin |
 |------------------|----------|
 | Receiver VCC     | 5V       |
