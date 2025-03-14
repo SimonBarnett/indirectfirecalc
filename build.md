@@ -1,4 +1,4 @@
-# Arduino Nano Modules 
+# Arduino Nano Modules
 
 | **Category**         | **Part Description**                                                                                   | **Quantity** | **Connections (Nano Pin → Module Pin)**                                                                                                   |
 |----------------------|--------------------------------------------------------------------------------------------------------|--------------|-------------------------------------------------------------------------------------------------------------------------------------------|
@@ -11,26 +11,26 @@
 | **Modules - Sensors**| Qyrugcxs Tf-Luna Lidar Range Sensor Module 8M Range Low Power Tof Range Principle                     | 1            | Nano D4 → Lidar TX, Nano D5 → Lidar RX, Nano GND → GND, Nano 5V → VCC (SoftwareSerial on D4/D5)                                          |
 | **Modules - Sensors**| DollaTek 5Pcs Tiny RTC I2C DS1307 AT24C32 Real Time Clock Module For Arduino AVR PIC 51 ARM            | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - UI**     | HALJIA 5Pcs Five Direction Navigation Button Module DIY Electronic PCB Board                          | 5            | Connected to a PCF8574 expander: com → GND, up → P0, down → P1, left → P2, right → P3, mid → P4, set → P5, reset → Nano RST; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
-| **Modules - UI**     | Universal 4 Key Push Button Switch Module 4 Channel Keyboard Board Compatible by Garosa                | 1            | Connected to a PCF8574 expander: Key1 → P0, Key2 → P1, Key3 → P2, Key4 → P3, GND → GND, VCC → 5V; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
-| **Modules - UI**     | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
+| **Modules - UI**     | Universal 4 Key Push Button Switch Module 4 Channel Keyboard Board Compatible by Garosa                | 1            | Nano D6 → Key1, Nano D7 → Key2, Nano D8 → Key3, Nano D9 → Key4, Nano GND → GND, Nano 5V → VCC (Direct connection to Nano pins)       |
+| **Modules - UI**     | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 4            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - UI**     | Fasizi 2Pcs 0.96" I2C IIC SPI Serial 128x64 OLED Display Module Board with Pin Headers                | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
-| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Pack of 10)                         | 10           | Nano D6 → 220Ω Resistor → Red Anode, Nano D7 → 220Ω Resistor → Green Anode, Nano GND → Common Cathode                                   |
-| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Additional)                         | 1            | Nano D8 → 220Ω Resistor → Red Anode, Nano D9 → 220Ω Resistor → Green Anode, Nano GND → Common Cathode                                   |
-| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Linked to Nano Light)               | 1            | Nano D13 → 220Ω Resistor → Red Anode, Nano GND → Common Cathode                                                                          |
-| **Modules - Bulb**   | UMTMedia® 30pcs 220 ohm O - 1/4W Watt Metal Film Resistors 0.25 ±1%                                   | 30           | N/A (Used in series with LED anodes as above)                                                                                            |
+| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Pack of 10)                         | 10           | N/A (No longer connected to Nano pins)                                                                                                   |
+| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Additional)                         | 1            | N/A (No longer connected to Nano pins)                                                                                                   |
+| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Linked to Nano Light)               | 1            | N/A (No longer connected to Nano pins)                                                                                                   |
+| **Modules - Bulb**   | UMTMedia® 30pcs 220 ohm O - 1/4W Watt Metal Film Resistors 0.25 ±1%                                   | 30           | N/A (Used as needed in the circuit)                                                                                                      |
 | **Modules - Power**  | AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module (Pack of 3)          | 3            | Shield 5V Out → Nano 5V, Shield 3.3V Out → Nano 3.3V, Shield GND → Nano GND (Power output to Nano)                                        |
 
 # Arduino Nano to Module Connections
 
 | Nano Pin (Left) | Connected To (Left)                                          | Connected To (Right)                                         | Nano Pin (Right) |
 |-----------------|--------------------------------------------------------------|--------------------------------------------------------------|------------------|
-| D13             | LED Red Anode (via 220Ω resistor)                            | Free                                                         | D12              |
+| D13             | Free                                                         | Free                                                         | D12              |
 | 3.3V            | Battery shield 3.3V out                                      | LORA module RX pin                                           | D11              |
 | REF             | Free                                                         | LORA module TX pin                                           | D10              |
-| A0              | Free                                                         | LED green anode (via 220Ω resistor)                          | D9               |
-| A1              | Free                                                         | LED red anode (via 220Ω resistor)                            | D8               |
-| A2              | ALAMSCN IR Receiver DAT                                      | LED green anode (via 220Ω resistor)                          | D7               |
-| A3              | ALAMSCN IR Transmitter DAT                                   | LED red anode (via 220Ω resistor)                            | D6               |
+| A0              | Free                                                         | Push Button 4 (Key4)                                         | D9               |
+| A1              | Free                                                         | Push Button 3 (Key3)                                         | D8               |
+| A2              | ALAMSCN IR Receiver DAT                                      | Push Button 2 (Key2)                                         | D7               |
+| A3              | ALAMSCN IR Transmitter DAT                                   | Push Button 1 (Key1)                                         | D6               |
 | A4              | I2C SDA: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module RX pin                                          | D5               |
 | A5              | I2C SCL: Magnetic Sensor, BME280, RTC, OLED, PCF8574         | Lidar module TX pin                                          | D4               |
 | A6              | Free                                                         | GPS module RX pin                                            | D3               |
@@ -146,16 +146,16 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 #### Universal 4 Key Push Button Switch Module
 
-| Module Pin | Connection                 |
-|------------|----------------------------|
-| GND        | GND                        |
-| VCC        | 5V                         |
-| Key1       | PCF8574 P0 (I2C on A4, A5) |
-| Key2       | PCF8574 P1 (I2C on A4, A5) |
-| Key3       | PCF8574 P2 (I2C on A4, A5) |
-| Key4       | PCF8574 P3 (I2C on A4, A5) |
+| Module Pin | Nano Pin |
+|------------|----------|
+| GND        | GND      |
+| VCC        | 5V       |
+| Key1       | D6       |
+| Key2       | D7       |
+| Key3       | D8       |
+| Key4       | D9       |
 
-**Note:** Connected to a separate PCF8574 expander with a unique I2C address, freeing up Nano pins A0–A3.
+**Note:** Directly connected to Nano pins D6–D9.
 
 #### PCF8574
 
@@ -166,7 +166,7 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** One PCF8574 module mapped here, connected to the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Multiple PCF8574s are used (e.g., for navigation buttons and 4-key module), each with a unique I2C address.
+**Note:** One PCF8574 module mapped here, connected to the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Used for the navigation buttons.
 
 #### OLED Module
 
@@ -181,42 +181,7 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 ### Modules - Bulb
 
-#### Red/Green Bi-Colour LED (Pack of 10)
-
-| Module Pin       | Nano Pin |
-|------------------|----------|
-| Red Anode        | D6 (via 220Ω resistor) |
-| Green Anode      | D7 (via 220Ω resistor) |
-| Common Cathode   | GND      |
-
-**Note:** One LED mapped here, connected to D6 and D7 via 220Ω resistors.
-
-#### Red/Green Bi-Colour LED (Additional)
-
-| Module Pin       | Nano Pin |
-|------------------|----------|
-| Red Anode        | D8 (via 220Ω resistor) |
-| Green Anode      | D9 (via 220Ω resistor) |
-| Common Cathode   | GND      |
-
-**Note:** One additional LED mapped here, connected to D8 and D9 via 220Ω resistors.
-
-#### Red/Green Bi-Colour LED (Linked to Nano Light)
-
-| Module Pin       | Nano Pin |
-|------------------|----------|
-| Red Anode        | D13 (via 220Ω resistor) |
-| Common Cathode   | GND      |
-
-**Note:** One LED linked to the Nano’s onboard LED on D13, using a 220Ω resistor. Mirrors the onboard LED’s state.
-
-#### 220 ohm Resistor
-
-| Module Pin | Nano Pin |
-|------------|----------|
-| N/A        | N/A      |
-
-**Note:** Resistors are used in series with LED anodes (D6-D9, D13) as specified above.
+- **Note:** All Red/Green Bi-Colour LEDs have been removed from the Nano pins. They are no longer connected directly to the Nano.
 
 ### Modules - Power
 
@@ -235,18 +200,15 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 ### General Notes
 
-- **I2C Bus:** Multiple modules (OLED, PCF8574 for navigation buttons, PCF8574 for 4-key module, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins **A4 (SDA)** and **A5 (SCL)**. Ensure each PCF8574 has a unique I2C address (configurable via address pins A0–A2 on the PCF8574 board) to avoid conflicts.
-- **ALAMSCN IR Module Updates:**
-  - **Receiver:** Moved from **D12** to **A2** (input).
-  - **Transmitter:** Remains on **A3** (output).
-- **Universal 4 Key Module Update:** Connected to a **PCF8574 expander** using pins **P0–P3**, freeing up Nano pins A0–A3.
+- **I2C Bus:** Multiple modules (OLED, PCF8574 for navigation buttons, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins **A4 (SDA)** and **A5 (SCL)**. Ensure each PCF8574 has a unique I2C address (configurable via address pins A0–A2 on the PCF8574 board) to avoid conflicts.
+- **Universal 4 Key Push Button Switch Module:** Now directly connected to Nano pins D6–D9, replacing the previous connection via a second PCF8574 expander. The second PCF8574 has been removed from the setup, reducing the total quantity to 4.
 - **Pin Availability:**
-  - **D0 (RX)** and **D1 (TX)** are free.
-  - **A0–A1** are free and can be used as digital I/O or analog inputs if needed.
-  - **A6–A7** remain free but are analog input-only pins (can be used as digital inputs, not outputs).
-  - **D12:** Now free after moving the ALAMSCN IR Receiver DAT to A2.
-- **D13 Usage:** Connected to an LED mirroring the Nano’s onboard LED, with a 220Ω resistor limiting current to ~13mA, keeping the total draw (onboard + external LED) within safe limits (~20mA).
+  - **D6–D9:** Used for the 4 Key Push Button Switch Module.
+  - **A0–A1:** Free for digital I/O or analog inputs.
+  - **A6–A7:** Free for analog inputs (can be used as digital inputs, not outputs).
+  - **D12 and D13:** Free for other uses.
+- **LEDs Removed:** All Red/Green Bi-Colour LEDs previously connected to D6–D9 and D13 are no longer connected to the Nano pins. If needed, they can be reconnected to other available pins (e.g., D12, A0–A1).
 
 ---
 
-This updated `guild.md` reflects the change of moving the **ALAMSCN IR Receiver DAT** from **D12** to **A2**, with all tables and notes adjusted accordingly. The document is consistent, and pin assignments have been verified to avoid conflicts. You can copy this directly into your `.md` file. Let me know if you need further adjustments!
+This updated `build.md` reflects the removal of the second PCF8574 IO Expansion Board and the direct connection of the Universal 4 Key Push Button Switch Module to pins D6 through D9 on the Arduino Nano. The LEDs previously connected to D6–D9 have been disconnected to accommodate the push buttons, and all tables and notes have been adjusted for consistency and accuracy. You can copy this directly into your `.md` file. Let me know if you need further adjustments!
