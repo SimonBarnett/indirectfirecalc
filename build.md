@@ -16,6 +16,7 @@
 | **Modules - UI**     | Fasizi 2Pcs 0.96" I2C IIC SPI Serial 128x64 OLED Display Module Board with Pin Headers                | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Pack of 10)                         | 10           | Nano D6 → 220Ω Resistor → Red Anode, Nano D7 → 220Ω Resistor → Green Anode, Nano GND → Common Cathode                                   |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Additional)                         | 1            | Nano D8 → 220Ω Resistor → Red Anode, Nano D9 → 220Ω Resistor → Green Anode, Nano GND → Common Cathode                                   |
+| **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Linked to Nano Light)               | 1            | Nano D13 → 220Ω Resistor → Red Anode, Nano GND → Common Cathode                                                                          |
 | **Modules - Bulb**   | UMTMedia® 30pcs 220 ohm O - 1/4W Watt Metal Film Resistors 0.25 ±1%                                   | 30           | N/A (Used in series with LED anodes as above)                                                                                            |
 | **Modules - Power**  | AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module (Pack of 3)          | 3            | Shield 5V Out → Nano 5V, Shield 3.3V Out → Nano 3.3V, Shield GND → Nano GND (Power output to Nano)                                        |
 
@@ -23,7 +24,7 @@
 
 | Nano Pin (Left) | Connected To (Left)                                          | Connected To (Right)                                         | Nano Pin (Right) |
 |-----------------|--------------------------------------------------------------|--------------------------------------------------------------|------------------|
-| D13             | ALAMSCN IR Transmitter DAT                                   | ALAMSCN IR Receiver DAT                                      | D12              |
+| D13             | LED Red Anode (via 220Ω resistor)                            | ALAMSCN IR Receiver DAT                                      | D12              |
 | 3.3V            | Battery shield 3.3V out                                      | LORA module RX pin                                           | D11              |
 | REF             | Free                                                         | LORA module TX pin                                           | D10              |
 | A0              | Push button 1 (Universal 4 Key)                              | LED green anode (via 220Ω resistor)                          | D9               |
@@ -36,7 +37,7 @@
 | A7              | Free                                                         | GPS module TX pin                                            | D2               |
 | 5V              | Multiple modules' VCC (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | GND              |
 | RST             | Navigation buttons' reset pin                                | (Same as left)                                               | RST              |
-| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Free                                                         | RX (D0)          |
+| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | ALAMSCN IR Transmitter DAT                                   | RX (D0)          |
 | VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
 
 # Module Connections to Arduino Nano
@@ -76,9 +77,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | Receiver DAT     | D12      |
 | Transmitter VCC  | 5V       |
 | Transmitter GND  | GND      |
-| Transmitter DAT  | D13      |
+| Transmitter DAT  | D0 (RX)  |
 
-**Note:** One pair of the ALAMSCN IR receiver and transmitter mapped here. The receiver’s **DAT** pin connects to Nano D12, and the transmitter’s **DAT** pin connects to Nano D13.
+**Note:** One pair of the ALAMSCN IR receiver and transmitter mapped here. The receiver’s **DAT** pin connects to Nano D12, and the transmitter’s **DAT** pin connects to Nano D0 (RX). Ensure serial communication (e.g., uploading code) is not in use when the transmitter is active to avoid interference.
 
 ### Modules - Sensors
 
@@ -199,13 +200,22 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 **Note:** One additional LED mapped here, connected to D8 and D9 via 220Ω resistors.
 
+#### Red/Green Bi-Colour LED (Linked to Nano Light)
+
+| Module Pin       | Nano Pin |
+|------------------|----------|
+| Red Anode        | D13 (via 220Ω resistor) |
+| Common Cathode   | GND      |
+
+**Note:** One LED linked to the Nano’s onboard LED on D13, using a 220Ω resistor. Mirrors the onboard LED’s state.
+
 #### 220 ohm Resistor
 
 | Module Pin | Nano Pin |
 |------------|----------|
 | N/A        | N/A      |
 
-**Note:** Resistors are used in series with LED anodes (D6-D9) as specified above.
+**Note:** Resistors are used in series with LED anodes (D6-D9, D13) as specified above.
 
 ### Modules - Power
 
@@ -220,4 +230,11 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 
 **Note:** This module provides power to the Nano. The **5V Out** connects to the Nano’s 5V pin, **3V Out** to the 3.3V pin if needed, and **GND** to any Nano GND pin. The **Micro USB** port connects to VIN for external 5V input.
 
-**General Note:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts. The ALAMSCN IR module uses digital pins D12 and D13 and does not share the I2C bus.
+---
+
+### General Notes
+- **I2C Bus:** Multiple modules (OLED, PCF8574, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Ensure each I2C device has a unique address to avoid communication conflicts.
+- **ALAMSCN IR Module:** Now uses digital pins D12 (receiver) and D0 (RX) (transmitter) and does not share the I2C bus. Be cautious when using D0 (RX) as it’s also the Nano’s serial RX pin—disconnect the transmitter during serial operations like code uploads.
+- **D13 Usage:** The new LED on D13 mirrors the onboard LED. The 220Ω resistor limits current to ~13mA, keeping the total draw (onboard + external LED) within safe limits (~20mA).
+
+---
