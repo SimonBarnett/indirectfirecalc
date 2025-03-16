@@ -10,10 +10,11 @@
 | **Modules - Sensors**| Diymore 2PCS GY-BME280 High Precision Digital Sensor Breakout Barometric Pressure Temperature Humidity | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - Sensors**| Qyrugcxs Tf-Luna Lidar Range Sensor Module 8M Range Low Power Tof Range Principle                     | 1            | Nano D4 → Lidar TX, Nano D5 → Lidar RX, Nano GND → GND, Nano 5V → VCC (SoftwareSerial on D4/D5)                                          |
 | **Modules - Sensors**| DollaTek 5Pcs Tiny RTC I2C DS1307 AT24C32 Real Time Clock Module For Arduino AVR PIC 51 ARM            | 5            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
-| **Modules - UI**     | HALJIA 5Pcs Five Direction Navigation Button Module DIY Electronic PCB Board                          | 5            | Connected to a PCF8574 expander: com → GND, up → P0, down → P1, left → P2, right → P3, mid → P4, set → P5, reset → Nano RST; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
+| **Modules - UI**     | HALJIA 5Pcs Five Direction Navigation Button Module DIY Electronic PCB Board                          | 5            | Connected to a PCF8574 expander: com → GND, up → P0, down → P1, left → P2, right → P3, mid → P4, set → P5; PCF8574 connected to Nano via I2C (A4 → SDA, A5 → SCL) |
 | **Modules - UI**     | Universal 4 Key Push Button Switch Module 4 Channel Keyboard Board Compatible by Garosa                | 1            | Nano D6 → Key1, Nano D7 → Key2, Nano D8 → Key3, Nano D9 → Key4, Nano GND → GND, Nano 5V → VCC (Direct connection to Nano pins)       |
 | **Modules - UI**     | Youmile 5 pcs PCF8574 IO Expansion Board PCF8574 I/O Expander I2C Evaluation Develop Module with DuPont Cable for Arduino & Raspberry Pi | 4            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
 | **Modules - UI**     | Fasizi 2Pcs 0.96" I2C IIC SPI Serial 128x64 OLED Display Module Board with Pin Headers                | 2            | Nano A4 → SDA, Nano A5 → SCL, Nano GND → GND, Nano 5V → VCC (I2C shared bus)                                                             |
+| **Modules - UI**     | DAOKAI 100PCS 2Pin Tactile Tact Push Button 6x6x5mm Vertical Momentary Switch Miniature Button Electronic Components for Panel PCB | 1            | Nano RST → Switch Pin 1, Nano GND → Switch Pin 2 (Hardware reset switch with 10kΩ pull-up to 5V)                                          |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Pack of 10)                         | 10           | N/A (No longer connected to Nano pins)                                                                                                   |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Additional)                         | 1            | N/A (No longer connected to Nano pins)                                                                                                   |
 | **Modules - Bulb**   | Red/Green Bi-Colour 5mm Diffused LED 60° 2V 25mA Light Lamp Bulb (Linked to Nano Light)               | 1            | N/A (No longer connected to Nano pins)                                                                                                   |
@@ -36,8 +37,8 @@
 | A6              | Free                                                         | GPS module RX pin                                            | D3               |
 | A7              | Free                                                         | GPS module TX pin                                            | D2               |
 | 5V              | Multiple modules' VCC (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | GND              |
-| RST             | Navigation buttons' reset pin                                | (Same as left)                                               | RST              |
-| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) | Free                                                         | RX (D0)          |
+| RST             | DAOKAI Tactile Push Button Switch Pin 1 (with 10kΩ to 5V)    | (Same as left)                                               | RST              |
+| GND             | Multiple modules' GND (GPS, LORA, Lidar, OLED, PCF8574, ALAMSCN, etc.) + DAOKAI Switch Pin 2 | Free                                                         | RX (D0)          |
 | VIN             | Battery shield VIN                                           | Free                                                         | TX (D1)          |
 
 # Module Connections to Arduino Nano
@@ -47,7 +48,6 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 ### Modules - Coms
 
 #### GPS Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -58,7 +58,6 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 **Note:** Uses SoftwareSerial on pins D2 (RX) and D3 (TX).
 
 #### LORA Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -69,7 +68,6 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 **Note:** Uses SoftwareSerial on pins D10 (RX) and D11 (TX).
 
 #### ALAMSCN Digital 38KHz Infrared IR Receiver Sensor Module with Transmitter Module Kit Set
-
 | Module Pin       | Nano Pin |
 |------------------|----------|
 | Receiver VCC     | 5V       |
@@ -79,12 +77,11 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | Transmitter GND  | GND      |
 | Transmitter DAT  | A3       |
 
-**Note:** One pair of the ALAMSCN IR receiver and transmitter mapped here. The receiver’s **DAT** pin connects to Nano A2 (input), and the transmitter’s **DAT** pin connects to Nano A3 (output).
+**Note:** One pair mapped here. Receiver DAT to A2 (input), Transmitter DAT to A3 (output).
 
 ### Modules - Sensors
 
 #### Magnetic Sensor
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -92,10 +89,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+**Note:** Connected to I2C bus on A4 (SDA) and A5 (SCL).
 
 #### BME280
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -103,10 +99,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+**Note:** Connected to I2C bus on A4 (SDA) and A5 (SCL).
 
 #### Lidar Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -114,10 +109,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | TX         | D4       |
 | RX         | D5       |
 
-**Note:** Uses SoftwareSerial on pins D4 (RX) and D5 (TX).
+**Note:** Uses SoftwareSerial on D4 (RX) and D5 (TX).
 
 #### RTC Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -125,12 +119,11 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+**Note:** Connected to I2C bus on A4 (SDA) and A5 (SCL).
 
 ### Modules - UI
 
 #### HALJIA Five Direction Navigation Button Module
-
 | Module Pin | Connection                 |
 |------------|----------------------------|
 | com        | GND                        |
@@ -140,12 +133,10 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | right      | PCF8574 P3 (I2C on A4, A5) |
 | mid        | PCF8574 P4 (I2C on A4, A5) |
 | set        | PCF8574 P5 (I2C on A4, A5) |
-| reset      | Nano RST                   |
 
-**Note:** One navigation module mapped, connected to a single PCF8574 expander via the I2C bus (A4 → SDA, A5 → SCL).
+**Note:** One module mapped, connected to a PCF8574 via I2C (A4 → SDA, A5 → SCL). Reset pin (previously on RST) is now software-managed via P5.
 
 #### Universal 4 Key Push Button Switch Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | GND        | GND      |
@@ -158,7 +149,6 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 **Note:** Directly connected to Nano pins D6–D9.
 
 #### PCF8574
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -166,10 +156,9 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** One PCF8574 module mapped here, connected to the I2C bus on Nano pins A4 (SDA) and A5 (SCL). Used for the navigation buttons.
+**Note:** One PCF8574 mapped, connected to I2C bus on A4 (SDA) and A5 (SCL). Used for navigation buttons.
 
 #### OLED Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | VCC        | 5V       |
@@ -177,16 +166,22 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | SDA        | A4       |
 | SCL        | A5       |
 
-**Note:** Connected to the I2C bus on pins A4 (SDA) and A5 (SCL).
+**Note:** Connected to I2C bus on A4 (SDA) and A5 (SCL).
+
+#### DAOKAI Tactile Push Button Switch
+| Module Pin | Nano Pin |
+|------------|----------|
+| Pin 1      | RST      |
+| Pin 2      | GND      |
+
+**Note:** 2-pin momentary switch with a 10kΩ pull-up resistor from RST to 5V. Pressing pulls RST low for a hardware reset.
 
 ### Modules - Bulb
-
-- **Note:** All Red/Green Bi-Colour LEDs have been removed from the Nano pins. They are no longer connected directly to the Nano.
+- **Note:** All Red/Green Bi-Colour LEDs are no longer connected to Nano pins.
 
 ### Modules - Power
 
 #### AZDelivery 18650 Lithium Li-ion Battery Expansion Shield 5V – 3V Micro USB Module
-
 | Module Pin | Nano Pin |
 |------------|----------|
 | 5V Out     | 5V       |
@@ -194,21 +189,19 @@ Below are the detailed connections for each module to the Arduino Nano, organize
 | GND        | GND      |
 | Micro USB  | VIN      |
 
-**Note:** This module provides power to the Nano. The **5V Out** connects to the Nano’s 5V pin, **3V Out** to the 3.3V pin if needed, and **GND** to any Nano GND pin. The **Micro USB** port connects to VIN for external 5V input.
+**Note:** Powers the Nano. 5V Out to Nano 5V, 3V Out to 3.3V if needed, GND to Nano GND, Micro USB to VIN for external 5V input.
 
 ---
 
 ### General Notes
-
-- **I2C Bus:** Multiple modules (OLED, PCF8574 for navigation buttons, Magnetic Sensor, BME280, RTC) share the I2C bus on Nano pins **A4 (SDA)** and **A5 (SCL)**. Ensure each PCF8574 has a unique I2C address (configurable via address pins A0–A2 on the PCF8574 board) to avoid conflicts.
-- **Universal 4 Key Push Button Switch Module:** Now directly connected to Nano pins D6–D9, replacing the previous connection via a second PCF8574 expander. The second PCF8574 has been removed from the setup, reducing the total quantity to 4.
+- **I2C Bus:** Shared by OLED, PCF8574, Magnetic Sensor, BME280, and RTC on A4 (SDA) and A5 (SCL). Ensure unique I2C addresses for each PCF8574 (set via A0–A2 pins).
+- **Reset Changes:** 
+  - HALJIA Navigation Button’s reset is disconnected from RST and now software-managed via PCF8574 P5.
+  - New DAOKAI Tactile Switch on RST provides hardware reset.
 - **Pin Availability:**
-  - **D6–D9:** Used for the 4 Key Push Button Switch Module.
-  - **A0–A1:** Free for digital I/O or analog inputs.
-  - **A6–A7:** Free for analog inputs (can be used as digital inputs, not outputs).
-  - **D12 and D13:** Free for other uses.
-- **LEDs Removed:** All Red/Green Bi-Colour LEDs previously connected to D6–D9 and D13 are no longer connected to the Nano pins. If needed, they can be reconnected to other available pins (e.g., D12, A0–A1).
+  - **D0, D1:** Free for digital I/O.
+  - **A6, A7:** Free for analog inputs (or digital inputs, not outputs).
+  - **D12, D13, A0, A1:** Used by LEDs but available if LEDs are removed.
+- **LEDs Removed:** Previously on D6–D9 and D13, now disconnected.
 
----
-
-This updated `build.md` reflects the removal of the second PCF8574 IO Expansion Board and the direct connection of the Universal 4 Key Push Button Switch Module to pins D6 through D9 on the Arduino Nano. The LEDs previously connected to D6–D9 have been disconnected to accommodate the push buttons, and all tables and notes have been adjusted for consistency and accuracy. You can copy this directly into your `.md` file. Let me know if you need further adjustments!
+This updated build reflects the addition of the DAOKAI Tactile Switch as a hardware reset on RST, with the navigation button’s reset repurposed for software control. Let me know if you need further adjustments!
